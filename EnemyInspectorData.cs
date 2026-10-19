@@ -12,7 +12,7 @@ using Imlight.CoreLib.Shared.Networking;
 
 namespace Imlight.CoreLib.Game;
 
-internal sealed record EnemyInspectorQuery(ulong PlayerId) : IServerMessage {
+internal sealed record EnemyInspectorQuery(ulong PlayerId, int SpellDropSetting = 0) : IServerMessage {
     public byte ServiceID => 102;
     public byte MessageOrder => 240;
 }
@@ -30,7 +30,7 @@ internal static class EnemyInspectorData {
         playerSlot >= 4 ? "1" : "-1");
 
     internal static string Snapshot(CoreObject creature, string name, MagicSchool school, int level,
-        ServerWizGameStats stats) {
+        ServerWizGameStats stats, int spellDropChance = 0) {
         string identity = string.Join("|", ((ulong)creature.m_globalID).ToString(CultureInfo.InvariantCulture), Number(creature.m_location.X),
             Number(creature.m_location.Y), Number(creature.m_location.Z), name.Replace("|", " "),
             school.ToString(), level.ToString(CultureInfo.InvariantCulture),
@@ -50,7 +50,8 @@ internal static class EnemyInspectorData {
         return "Snapshot|" + identity + "|" + string.Join(";", rows) + "|" + string.Join(",",
             Number(100 * (stats.m_powerPipBase + stats.m_powerPipBonusPercentAll)),
             Number(100 * stats.m_stunResistancePercent), Number(100 * stats.m_healBonusPercentAll),
-            Number(100 * stats.m_healIncBonusPercentAll), Number(stats.m_shadowPipRating));
+            Number(100 * stats.m_healIncBonusPercentAll), Number(stats.m_shadowPipRating)) + "|" +
+            (spellDropChance > 0 ? SpellDropRules.Percent(spellDropChance) : "OFF");
     }
 
     private static float Total(List<float>? values, float universal, MagicSchool school) {

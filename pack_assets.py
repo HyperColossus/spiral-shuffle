@@ -124,6 +124,8 @@ def main() -> None:
     if inspector.exists():
         overrides["GUI/RandomizerEnemyInspector.gui"] = inspector.read_bytes()
     overrides["Scripts/Randomizer/EnemyInspector.lua"] = (ROOT / "EnemyInspector.lua").read_bytes()
+    overrides["GUI/RandomizerSpellReward.gui"] = (NATIVE / "RandomizerSpellReward.gui").read_bytes()
+    overrides["Scripts/Randomizer/SpellRewards.lua"] = (ROOT / "SpellRewards.lua").read_bytes()
     for mode in [*range(1, 7), *range(17, 23)]:
         overrides[f"Scripts/Randomizer/Menu{mode}.lua"] = (NATIVE / f"Menu{mode}.lua").read_bytes()
     forbidden = [name for name in overrides if name != "TemplateManifest.xml" and

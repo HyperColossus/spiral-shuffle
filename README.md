@@ -6,6 +6,8 @@ Travel and spawn points stay normal.
 
 Optional vendor shuffle gives each wizard their own random item and treasure-card stock, saved across reloads.
 
+Optional spell drops permanently teach new spells from creature kills. Type a rate from 0.1%-100% and press Set. Random mode rolls separate odds per enemy, usually low; Fixed uses your exact rate. Fixed at 100% guarantees a new spell per creature until you know them all. Hover to see the odds. A parchment popup reveals your cards after the fight.
+
 ## Setup
 
 Windows, Python 3.12+, .NET 10 SDK, and a working Revive101 install with the full **r806919.Wizard_1_610** Aurorium files. Allow about 25 GB for the separate client.

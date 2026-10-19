@@ -35,6 +35,8 @@ internal static class RandomizerRuntime {
 
     internal static bool Enabled => File.Exists(CatalogPath);
 
+    internal static IReadOnlyList<DropSpell> DropSpellPool => Data.Value.DropSpells;
+
     internal static string ModeName(int mode) => CreatureRandomization.RealmName(mode);
 
     internal static int GetMode(ulong accountId) {
@@ -68,6 +70,23 @@ internal static class RandomizerRuntime {
     internal static bool TryReadOptions(ByteString message, out int mode, out bool vendors) {
         mode = 0;
         vendors = false;
+        if (!TryReadMenuMessage(message, "SpiralShuffle", out int score)) {
+            return false;
+        }
+
+        int selectedMode = score & 15;
+        bool selectedVendors = (score & 16) != 0;
+        if (selectedMode < 1 || selectedMode > 6 || score != selectedMode + (selectedVendors ? 16 : 0)) {
+            return false;
+        }
+
+        mode = selectedMode;
+        vendors = selectedVendors;
+        return true;
+    }
+
+    internal static bool TryReadMenuMessage(ByteString message, string name, out int score) {
+        score = 0;
         if (!Enabled) {
             return false;
         }
@@ -85,15 +104,11 @@ internal static class RandomizerRuntime {
             }
 
             choice.Decode(new BitReader(raw[4..length]));
-            int selectedMode = choice.score & 15;
-            bool selectedVendors = (choice.score & 16) != 0;
-            if (choice.gameName != "SpiralShuffle" || selectedMode < 1 || selectedMode > 6 ||
-                choice.score != selectedMode + (selectedVendors ? 16 : 0)) {
+            if (choice.gameName != name) {
                 return false;
             }
 
-            mode = selectedMode;
-            vendors = selectedVendors;
+            score = choice.score;
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or OverflowException) {
@@ -177,6 +192,7 @@ internal static class RandomizerRuntime {
         public List<Equipment> Equipment { get; set; } = [];
         public List<CreatureSwap> CreatureSwaps { get; set; } = [];
         public List<SpellVariant> SpellVariants { get; set; } = [];
+        public List<DropSpell> DropSpells { get; set; } = [];
     }
 
     private sealed class CreatureSwap {

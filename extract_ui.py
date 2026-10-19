@@ -15,6 +15,7 @@ def main() -> None:
     filenames = {
         "GUI/CharacterSelectWindow.gui": "CharacterSelectWindow.gui.bin",
         "GUI/ToolTip.gui": "ToolTip.gui",
+        "GUI/GameLoginWindow.gui": "GameLoginWindow.gui",
     }
     with archive.open("rb") as stream:
         for source, filename in filenames.items():

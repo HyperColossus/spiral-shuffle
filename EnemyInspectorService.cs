@@ -51,7 +51,8 @@ internal sealed class EnemyInspectorService(SessionActor sessionActor) : Message
             _lastQuery = DateTime.UtcNow;
             SessionActor.GetZoneActor()?.Tell(new ZONE_102_PROTOCOL.MSG_ZONEBROADCAST {
                 Targets = ZoneBroadcastTarget.Sigils,
-                Messages = [new EnemyInspectorQuery(GetActiveWizard().GameObjectID)]
+                Messages = [new EnemyInspectorQuery(GetActiveWizard().GameObjectID,
+                    SpellDrops.GetSetting(GetActiveWizard().AccountId))]
             }, Self);
         }
     }

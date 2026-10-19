@@ -10,6 +10,7 @@ internal sealed record Equipment(uint Id, string Name, string Slot, string Schoo
 internal sealed record Swap(uint From, uint To, string Source, string Target);
 internal sealed record CreatureSwap(uint From, uint To, string Source, string Target, uint Alias);
 internal sealed record SpellVariant(uint Original, int Difficulty, uint TemplateId, double Multiplier);
+internal sealed record DropSpellAsset(uint Original, string Name, string School, uint[] Variants, double[] Multipliers);
 
 internal static class Program {
     private static readonly BindSerializer Codec = new();
@@ -33,6 +34,13 @@ internal static class Program {
         Dictionary<uint, TemplateLocation> locations = manifest.m_serializedTemplates
             .GroupBy(location => location.m_id).ToDictionary(group => group.Key, group => group.First());
         HashSet<uint> playerSpells = PlayerSpells(root);
+        HashSet<uint> dropSpellIds = DropSpellCandidates(root, playerSpells);
+        foreach ((uint id, TemplateLocation location) in locations) {
+            if (new[] { "Spells/Tiered Spells/", "Spells/Trained Spells/", "Spells/Shadow Spells/" }
+                .Any(prefix => location.m_filename.ToString().StartsWith(prefix, StringComparison.Ordinal))) {
+                dropSpellIds.Add(id);
+            }
+        }
         Dictionary<string, WizardStatTable> statTables = archive.Files.Keys
             .Where(path => path.StartsWith("GameEffectRuleData/", StringComparison.Ordinal) && path.EndsWith(".xml"))
             .Select(path => Read<WizardStatTable>(archive, path)).OfType<WizardStatTable>()
@@ -47,6 +55,7 @@ internal static class Program {
         List<Swap> spellSwaps = [];
         List<CreatureSwap> creatureSwaps = [];
         List<SpellVariant> spellVariants = [];
+        List<DropSpellAsset> dropSpells = [];
         BindDocument rawManifest = ReadBinary(archive, "TemplateManifest.xml");
         BindProperty locationProperty = rawManifest.Value.Get<TemplateManifest>("m_serializedTemplates");
         List<BindObject> rawLocations = BindDocument.ReadVector(locationProperty);
@@ -226,16 +235,17 @@ internal static class Program {
                 creatureSwaps.Add(new(original.Id, donor.Id, original.Name, donor.Name, alias));
             }
 
+            dropSpells = BuildDropSpells(archive, locations, dropSpellIds, occupiedIds, rawLocations, locationRecords, zip, seed);
             rawManifest.Value.Set<TemplateManifest>("m_serializedTemplates", BindDocument.WriteVector(locationProperty, rawLocations));
             Write(zip, "TemplateManifest.xml", rawManifest);
         }
 
         File.WriteAllText(Path.Combine(output, "catalog.json"), JsonSerializer.Serialize(new {
             Seed = seed, Creatures = creatures, Equipment = equipment, SpellSwaps = spellSwaps, CreatureSwaps = creatureSwaps,
-            SpellVariants = spellVariants, GearRolls = gearRolls, RejectedTemplates = rejected,
+            SpellVariants = spellVariants, DropSpells = dropSpells, GearRolls = gearRolls, RejectedTemplates = rejected,
         }, JsonOptions));
         Console.WriteLine($"Built {spellSwaps.Count} spell swaps, {gearRolls} gear rolls, " +
-            $"{creatureSwaps.Count} creature swaps, {equipment.Count} loot candidates.");
+            $"{creatureSwaps.Count} creature swaps, {equipment.Count} loot candidates, {dropSpells.Count} spell-drop candidates.");
         return 0;
     }
 
@@ -251,6 +261,56 @@ internal static class Program {
         BindObject result = BindObject.Read(source.Encode());
         result.Set<TemplateLocation>("m_id", result.Get<TemplateLocation>("m_id").WithUnsigned(id));
         result.Set<TemplateLocation>("m_filename", result.Get<TemplateLocation>("m_filename").WithString(path));
+        return result;
+    }
+
+    private static List<DropSpellAsset> BuildDropSpells(Archive archive, Dictionary<uint, TemplateLocation> locations,
+        HashSet<uint> playerSpells, HashSet<uint> occupiedIds, List<BindObject> rawLocations,
+        Dictionary<uint, BindObject> locationRecords, ZipArchive zip, string seed) {
+        List<DropSpellAsset> result = [];
+        HashSet<(string School, string Name)> seen = [];
+        foreach (uint originalId in playerSpells.Order()) {
+            if (!locations.TryGetValue(originalId, out TemplateLocation? location) ||
+                !location.m_filename.ToString().StartsWith("Spells/", StringComparison.Ordinal)) {
+                continue;
+            }
+
+            SpellTemplate? spell = Read<SpellTemplate>(archive, location.m_filename);
+            if (spell is null || spell.m_Treasure || spell.m_PvP || spell.m_battlegroundsOnly ||
+                spell.m_alwaysFizzle || spell.m_effects is not { Count: > 0 } || spell.m_displayName.IsEmpty ||
+                new[] { "MOB", "Boss", "Test", "CHEAT", "QA_", "BG_", "Debug", "100K" }
+                    .Any(token => spell.m_name.ToString().Contains(token, StringComparison.OrdinalIgnoreCase)) ||
+                new[] { "Battleground", "Fight Specific", "/Mobs/", "CombatTrigger", "Minion Specific" }
+                    .Any(token => location.m_filename.ToString().Contains(token, StringComparison.OrdinalIgnoreCase)) ||
+                !seen.Add((spell.m_sMagicSchoolName, spell.m_displayName))) {
+                continue;
+            }
+
+            uint[] variants = new uint[3];
+            double[] multipliers = new double[3];
+            for (int difficulty = 1; difficulty <= 3; difficulty++) {
+                string name = $"SpiralDrop{difficulty}_{originalId}";
+                uint id = StringHash.Compute(name);
+                for (int suffix = 1; !occupiedIds.Add(id); suffix++) {
+                    name = $"SpiralDrop{difficulty}_{originalId}_{suffix}";
+                    id = StringHash.Compute(name);
+                }
+
+                BindDocument variant = ReadBinary(archive, location.m_filename);
+                variant.Value.Set<SpellTemplate>("m_name", variant.Value.Get<SpellTemplate>("m_name").WithString(name));
+                double multiplier = SpellStatRandomizer.Multiplier(difficulty, Unit(seed, $"drop-stats:{originalId}"));
+                SpellStatRandomizer.Apply(variant, spell, multiplier, true);
+                string path = $"ObjectData/Randomizer/DropSpell{id}.xml";
+                Write(zip, path, variant);
+                rawLocations.Add(AliasLocation(locationRecords[originalId], id, path));
+                variants[difficulty - 1] = id;
+                WriteRewardCard(zip, id, name);
+                multipliers[difficulty - 1] = multiplier;
+            }
+
+            result.Add(new(originalId, spell.m_name, spell.m_sMagicSchoolName, variants, multipliers));
+        }
+
         return result;
     }
 
@@ -284,6 +344,24 @@ internal static class Program {
         foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "Imlight/spiraldb-cache/QuestTemplates"), "*.json")) {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(file), JsonReadOptions);
             AddQuestSpells(document.RootElement, ids);
+        }
+
+        return ids;
+    }
+
+    private static HashSet<uint> DropSpellCandidates(string root, HashSet<uint> playerSpells) {
+        HashSet<uint> ids = [.. playerSpells];
+        foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "Imlight/spiraldb-cache/DropTables"), "*.json")) {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(file), JsonReadOptions);
+            if (!document.RootElement.TryGetProperty("Items", out JsonElement items)) {
+                continue;
+            }
+
+            foreach (JsonElement item in items.EnumerateArray()) {
+                if (item.TryGetProperty("ItemId", out JsonElement value) && uint.TryParse(value.GetString(), out uint id)) {
+                    ids.Add(id);
+                }
+            }
         }
 
         return ids;
@@ -328,6 +406,15 @@ internal static class Program {
 
         using Stream stream = zip.CreateEntry(path, CompressionLevel.Fastest).Open();
         stream.Write(bytes);
+    }
+
+    private static void WriteRewardCard(ZipArchive zip, uint id, string name) {
+        string gui = "<Objects><Class Name=\"class GraphicalSpellWindow\">" +
+            "<m_sName>rewardCard</m_sName><m_Style>HAS_NO_BORDER|DO_NOT_CAPTURE_MOUSE</m_Style>" +
+            "<m_Flags>VISIBLE</m_Flags><m_Window>0,0,194,272</m_Window>" +
+            $"<m_spellName>{name}</m_spellName><m_grayscale>0</m_grayscale></Class></Objects>";
+        using Stream stream = zip.CreateEntry($"GUI/Randomizer/SpellDrop{id}.gui", CompressionLevel.Fastest).Open();
+        stream.Write(System.Text.Encoding.UTF8.GetBytes(gui));
     }
 
     private static double Unit(string seed, string key) {

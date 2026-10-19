@@ -41,7 +41,7 @@ def main() -> None:
 
     rules_background = copy.deepcopy(background)
     set_value(rules_background, "m_sName", "shuffleRulesPaper")
-    set_value(rules_background, "m_Window", "496,320,870,616")
+    set_value(rules_background, "m_Window", "496,45,870,616")
     rules_background.find(".//m_sFilename").text = "GUI/paper_texture.dds"
     add_control(window, rules_background)
 
@@ -83,12 +83,31 @@ def main() -> None:
     text("shuffleStatus", f"<center>Selected: Shuffle | Seed: {seed}</center>", "58,436,442,478", "0.53")
     button("shuffleNew", "New Level 1 Wizard", "77,484,421,531", "0.63")
     button("shuffleContinue", "Choose My Wizard", "77,540,421,584", "0.63")
-    text("shuffleCreatureTitle", "<center>WORLD RULES</center>", "501,329,861,369", "0.71", fancy=True)
-    button("shuffleCreatures", "Creature Stats Only", "507,374,855,421", "0.60")
-    text("shuffleCreatureDescription", "", "512,427,850,474", "0.51")
-    text("shuffleCreatureLimits", "<center>Stat ranges follow your difficulty.</center>", "512,476,850,499", "0.46")
-    button("shuffleVendors", "Randomize Vendors: OFF", "507,509,855,555", "0.59")
-    text("shuffleVendorDescription", "<center>Every wizard gets their own shop stock.<br>Rolls stay the same after reloading.</center>", "512,562,850,609", "0.49")
+    text("shuffleCreatureTitle", "<center>WORLD RULES</center>", "501,66,861,110", "0.71", fancy=True)
+    button("shuffleCreatures", "Creature Stats Only", "507,120,855,167", "0.60")
+    text("shuffleCreatureDescription", "", "512,174,850,224", "0.51")
+    button("shuffleVendors", "Randomize Vendors: OFF", "507,239,855,286", "0.59")
+    text("shuffleVendorDescription", "<center>Each wizard keeps their own shop rolls.</center>", "512,293,850,326", "0.49")
+    button("shuffleSpellDrops", "Spell Drops: OFF", "507,344,855,391", "0.61")
+    button("shuffleDropMode", "Odds: Random per enemy", "507,400,855,442", "0.53")
+    button("shuffleDropLess", "-", "507,452,557,494", "0.65")
+    login = ET.parse(ROOT / ".build/research/GameLoginWindow.gui")
+    edit = copy.deepcopy(next(node for node in login.iter("Class") if node.findtext("m_sName") == "loginName"))
+    for name, value in {"m_sName": "shuffleDropInput", "m_Window": "568,459,683,491", "m_Flags": "VISIBLE",
+                        "m_nMaxLength": "6", "m_sText": "1", "m_fMinRange": "0.1", "m_fMaxRange": "100"}.items():
+        set_value(edit, name, value)
+    style = edit.find("m_pWindowStyle/Class")
+    style.find("m_pBackMaterial").clear()
+    style.find("m_BackColor").text = "FFB7DAEE"
+    style.find("m_Color").text = "FF1B2235"
+    style.find("m_pFont/Class/m_sFilename").text = "Fonts/WizardNormal.xml"
+    style.find("m_pFont/Class/m_fScale").text = "0.64"
+    add_control(window, edit)
+    text("shuffleDropRate", "%", "689,458,724,494", "0.58")
+    button("shuffleDropApply", "Set", "728,452,798,494", "0.50")
+    button("shuffleDropMore", "+", "804,452,855,494", "0.65")
+    text("shuffleDropHint", "", "512,503,850,565", "0.43")
+    text("shuffleCreatureLimits", "<center>For every creature: Fixed + 100%.</center>", "512,574,850,611", "0.44")
     text("shuffleTravel", "<center>Travel and spawn points stay fixed.</center>", "53,587,447,626", "0.48")
     OUTPUT.mkdir(parents=True, exist_ok=True)
     ET.indent(menu, space="    ")

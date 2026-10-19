@@ -35,7 +35,7 @@ local function receiveSnapshot(payload)
     local enemy = {id = fields[2], x = tonumber(fields[3]), y = tonumber(fields[4]),
         z = tonumber(fields[5]), name = fields[6], school = fields[7], level = fields[8],
         health = tonumber(fields[9]), maxHealth = tonumber(fields[10]), rows = {},
-        extras = split(fields[12], ","), updated = tick};
+        extras = split(fields[12], ","), dropChance = fields[13] or "OFF", updated = tick};
     if not enemy.x or not enemy.y or not enemy.z or not enemy.health then
         return;
     end
@@ -110,6 +110,7 @@ local function updateText(enemy)
     panel.FindNamedWindow("enemyPips").SetText("Power pips " .. (extras[1] or "0") .. "% | Stun resist " .. (extras[2] or "0") .. "%");
     panel.FindNamedWindow("enemyExtras").SetText("Healing " .. (extras[3] or "0") .. "/" .. (extras[4] or "0") ..
         "% | Shadow " .. (extras[5] or "0"));
+    panel.FindNamedWindow("enemySpellDrop").SetText("Spell drop chance: " .. enemy.dropChance);
 end
 
 local function updatePanel()

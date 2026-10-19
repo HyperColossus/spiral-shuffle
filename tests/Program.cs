@@ -84,6 +84,8 @@ internal static class Program {
         checks += WorldStateTests.Run(runtime.Assembly);
         checks += VendorTests.Run(runtime.Assembly, root);
         checks += ServiceRoutingTests.Run(runtime.Assembly);
+        checks += SpellDropTests.Run(runtime.Assembly, root);
+        checks += SpellRewardTests.Run();
         Console.WriteLine($"Passed {checks} runtime checks: six mode choices, creature routing, individual stat bounds, spell variants, loot requirements, and enemy inspector values.");
         return 0;
     }
@@ -186,8 +188,9 @@ internal static class Program {
             m_dmgReducePercentAll = 0.15f, m_accBonusPercentAll = -0.04f,
             m_criticalHitRatingAll = 100, m_blockRatingAll = 200
         };
-        string[] fields = ((string)snapshot.Invoke(null, [creature, "WizardMobs_00000027", MagicSchool.Balance, 1, stats])!).Split('|');
-        Equal(12, fields.Length);
+        string[] fields = ((string)snapshot.Invoke(null, [creature, "WizardMobs_00000027", MagicSchool.Balance, 1, stats, 1234])!).Split('|');
+        Equal(13, fields.Length);
+        Equal("0.1234%", fields[12]);
         Equal("1234567890123456789", fields[1]);
         Equal("125", fields[8]);
         Equal("193", fields[9]);
@@ -202,12 +205,13 @@ internal static class Program {
         Equal("100", death[7]);
         Equal("0", death[9]);
         Equal(true, stats.m_dmgReducePercent is null);
-        fields = ((string)snapshot.Invoke(null, [creature, "name", MagicSchool.Death, 60, stats])!).Split('|');
+        fields = ((string)snapshot.Invoke(null, [creature, "name", MagicSchool.Death, 60, stats, 0])!).Split('|');
+        Equal("OFF", fields[12]);
         Require(float.Parse(fields[10].Split(';')[0].Split(',')[9], System.Globalization.CultureInfo.InvariantCulture) > 0,
             "High level critical chance was omitted from the inspector.");
         Equal("Planning|10|20|30|0.12345679|1", camera.Invoke(null, [creature.m_location, 0.12345679f, 4]));
         Equal("Planning|10|20|30|0|-1", camera.Invoke(null, [creature.m_location, 0f, 0]));
-        return 16;
+        return 18;
     }
 
     private static void Require(bool condition, string message) {

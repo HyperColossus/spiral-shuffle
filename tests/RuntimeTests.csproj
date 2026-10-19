@@ -12,6 +12,10 @@
     <Compile Include="WorldStateTests.cs" />
     <Compile Include="VendorTests.cs" />
     <Compile Include="ServiceRoutingTests.cs" />
+    <Compile Include="SpellDropTests.cs" />
+    <Compile Include="SpellRewardTests.cs" />
+    <Compile Include="../SpellRewards.cs" Link="SpellRewards.cs" />
+    <Compile Include="../SpellDropRules.cs" Link="SpellDropRules.cs" />
     <Compile Include="../CreatureRandomization.cs" Link="CreatureRandomization.cs" />
     <Reference Include="../server-build/bin/Release/net10.0/Imlight.CoreLib.dll" />
     <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" />
