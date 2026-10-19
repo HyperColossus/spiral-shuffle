@@ -59,6 +59,15 @@ def copy_server(revive: Path) -> None:
                     ignore=shutil.ignore_patterns("*.log", "*.pfx", "*.pem", "*.key"))
 
 
+def build_server(dotnet: str) -> None:
+    run(dotnet, "build", "director-build/Imlight.Director.csproj", "-c", "Release", "-v", "quiet")
+    output = ROOT / "director-build/bin/Release/net10.0"
+    for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
+        require_file(output / name)
+    for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
+        shutil.copy2(output / name, SERVER / name)
+
+
 def replace_setting(config: str, name: str, value: str) -> str:
     content, count = re.subn(rf"(?m)^{re.escape(name)}\s*=.*$", lambda _: f"{name} = {value}", config)
     if count != 1:
@@ -143,7 +152,9 @@ def main() -> None:
     sdk_list = subprocess.check_output([dotnet, "--list-sdks"], text=True)
     if not re.search(r"(?m)^10\.", sdk_list):
         parser.error("The .NET 10 SDK is required.")
-    for path in [revive / "Imlight/Imlight.Director.exe", revive / "Imlight/Imcodec.ObjectProperty.dll",
+    for path in [revive / "Imlight/Imlight.Director.exe", revive / "Imlight/Imlight.Director.dll",
+                 revive / "Imlight/Imlight.Director.deps.json", revive / "Imlight/Imlight.Director.runtimeconfig.json",
+                 revive / "Imlight/Imlight.CoreLib.dll", revive / "Imlight/Imcodec.ObjectProperty.dll",
                  revive / "Aurorium/data" / REVISION / "Data/GameData/Root.wad",
                  revive / "Aurorium/data" / REVISION / "LatestFileList.bin",
                  revive / "Aurorium/data" / REVISION / "LatestFileList.xml",
@@ -162,8 +173,7 @@ def main() -> None:
     configure_server(revive)
     print("Building the server and randomized assets...", flush=True)
     run(sys.executable, "prepare_source.py")
-    run(dotnet, "build", "server-build/Imlight.CoreLib.csproj", "-c", "Release", "-v", "quiet")
-    shutil.copy2(ROOT / "server-build/bin/Release/net10.0/Imlight.CoreLib.dll", SERVER / "Imlight.CoreLib.dll")
+    build_server(dotnet)
     run(dotnet, "run", "--project", "asset-tool", "-c", "Release", "--", str(revive),
         str(RUNTIME / "generated"), args.seed)
     run(sys.executable, "extract_ui.py")
