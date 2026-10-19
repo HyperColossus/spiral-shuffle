@@ -1,0 +1,237 @@
+"""Prepare an isolated server build with the native randomizer menu hooks."""
+import shutil
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+ORIGINAL = ROOT / ".build/upstream/Imlight-b07987168fcfa2d123a5d78df90ca0c76405e427/src/Imlight.CoreLib"
+SOURCE = ROOT / ".build/source"
+
+
+def replace(relative: str, before: str, after: str) -> None:
+    path = SOURCE / relative
+    content = path.read_text(encoding="utf-8-sig")
+    if content.count(before) != 1:
+        raise ValueError(f"Expected exactly one hook in {relative}: {before[:60]}")
+    path.write_text(content.replace(before, after).replace("\u2014", ","), encoding="utf-8")
+
+
+def patch_quest_flow() -> None:
+    replace("Game/Services/QuestService.cs", """    private void SendQuestResumeMessage(QuestTemplate qTemplate, QuestInstance qInstance) {
+        var qMadLibs""", """    private void SendQuestResumeMessage(QuestTemplate qTemplate, QuestInstance qInstance) {
+        if (qTemplate.m_isHidden) {
+            return;
+        }
+
+        var qMadLibs""")
+    replace("Game/Services/QuestService.cs", """        SendToSocket(qSendMsg);
+        ShowQuestStartDialogue(qTemplate);""", """        if (!qTemplate.m_isHidden) {
+            SendToSocket(qSendMsg);
+        }
+        ShowQuestStartDialogue(qTemplate);""")
+    replace("Game/Services/QuestService.cs", """    private void SendGoalMessage(GoalTemplate gTemplate, QuestInstance qInstance, byte sendType = 0, bool forceSendDestZone = true) {
+        var gInstance""", """    private void SendGoalMessage(GoalTemplate gTemplate, QuestInstance qInstance, byte sendType = 0, bool forceSendDestZone = true) {
+        if (GetQuestTemplate(qInstance.QuestName)?.m_isHidden == true) {
+            return;
+        }
+
+        var gInstance""")
+    replace("Game/Services/TutorialService.cs", """        if (!IsTutorialZone(wizard.Zone)) {
+            return;
+        }
+
+        if (!_serializer.Serialize(_tutorialInfo,""", """        if (!IsTutorialZone(wizard.Zone)) {
+            if (wizard.HasQuest(TUTORIAL_INTRO_QUEST_NAME)) {
+                CompleteTutorialIntro(wizard, GetActiveGameObject());
+            }
+
+            return;
+        }
+
+        if (!_serializer.Serialize(_tutorialInfo,""")
+    replace("Game/Services/TutorialService.cs", """            RemoveControlQuests(wizard);
+            CompleteTutorialIntro(wizard, playerObj);
+            EquipStarterWandAndDeck(wizard);""", """            if (!CompleteTutorialIntro(wizard, playerObj)) {
+                return false;
+            }
+
+            RemoveControlQuests(wizard);
+            EquipStarterWandAndDeck(wizard);""")
+    replace("Game/Services/TutorialService.cs", """        if (goalName == "Teleport") {
+            RemoveControlQuests(wizard);""", """        if (goalName == "Teleport") {
+            if (!CompleteTutorialIntro(wizard, playerObj)) {
+                return false;
+            }
+
+            RemoveControlQuests(wizard);""")
+    replace("Game/Services/TutorialService.cs", """    private bool CompleteTutorialIntro(Wizard wizard, CoreObject playerObj) {
+        // Skippers""", """    private bool CompleteTutorialIntro(Wizard wizard, CoreObject playerObj) {
+        if (wizard.HasCompletedQuest(TUTORIAL_INTRO_QUEST_NAME)) {
+            if (wizard.HasQuest(TUTORIAL_INTRO_QUEST_NAME)) {
+                RemoveQuestAndClearFromJournal(wizard, TUTORIAL_INTRO_QUEST_NAME);
+            }
+
+            return true;
+        }
+
+        // Skippers""")
+    replace("Game/Services/TutorialService.cs", """        var removeSuccess = wizard.CompleteQuestGoal(TUTORIAL_INTRO_QUEST_NAME, TUTORIAL_INTRO_GOAL_NAME);
+
+        var questTemplate""", """        var questTemplate""")
+    replace("Game/Services/TutorialService.cs", """        ResultDispatcher.ExecuteResults(
+            actorContext: Context,
+            results: goalTemplate.m_completeResults,
+            playerRef: SessionActor.ActorRef,
+            playerObj: playerObj,
+            questName: TUTORIAL_INTRO_QUEST_NAME,
+            goalName: TUTORIAL_INTRO_GOAL_NAME,
+            zoneActor: SessionActor.GetZoneActor()
+        );
+
+        return removeSuccess;""", """        if (!goalInstance.IsGoalCompleted()) {
+            if (!wizard.CompleteQuestGoal(TUTORIAL_INTRO_QUEST_NAME, TUTORIAL_INTRO_GOAL_NAME)) {
+                return false;
+            }
+
+            ResultDispatcher.ExecuteResults(
+                actorContext: Context,
+                results: goalTemplate.m_completeResults,
+                playerRef: SessionActor.ActorRef,
+                playerObj: playerObj,
+                questName: TUTORIAL_INTRO_QUEST_NAME,
+                goalName: TUTORIAL_INTRO_GOAL_NAME,
+                zoneActor: SessionActor.GetZoneActor()
+            );
+        }
+
+        if (!wizard.CompleteQuest(TUTORIAL_INTRO_QUEST_NAME)) {
+            return false;
+        }
+
+        SendToSocket(new QUEST_MESSAGES_52_PROTOCOL.MSG_REMOVEQUEST { QuestID = instance.ID });
+        Logger.Information("Finished tutorial handoff for {0}.", Logger.Args(wizard.PlayerNameBehavior.GetWizardName()));
+        return true;""")
+
+
+def main() -> None:
+    shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
+    for path in SOURCE.rglob("*.cs"):
+        content = path.read_text(encoding="utf-8-sig")
+        if "\u2014" in content:
+            path.write_text(content.replace("\u2014", ","), encoding="utf-8")
+    patch_quest_flow()
+    shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
+    shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
+    shutil.copy2(ROOT / "CreatureRandomization.cs", SOURCE / "Game/CreatureRandomization.cs")
+    shutil.copy2(ROOT / "EnemyInspectorService.cs", SOURCE / "Game/Services/EnemyInspectorService.cs")
+    shutil.copy2(ROOT / "EnemyInspectorData.cs", SOURCE / "Game/EnemyInspectorData.cs")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(EnemyInspectorService),")
+    replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId) {
+            return;
+        }
+
+        // The raw message is just like any other message sent by the client.""")
+    shutil.copy2(ROOT / "RandomizerLevelRequirement.cs", SOURCE / "Game/Requirements/Handlers/RandomizerLevelRequirement.cs")
+    replace("Login/Services/CharacterService.cs", "        SendToSocket(new LOGIN_7_PROTOCOL.MSG_CHARACTERLIST());", """        SendToSocket(new LOGIN_7_PROTOCOL.MSG_CHARACTERLIST());
+        if (Imlight.CoreLib.Game.RandomizerRuntime.Enabled) {
+            var mode = Imlight.CoreLib.Game.RandomizerRuntime.GetMode(account.AccountId);
+            SendToSocket(new GAME_5_PROTOCOL.MSG_START_CLIENT_PROCESS {
+                OwnerGID = 0,
+                JobID = Imlight.CoreLib.Game.RandomizerRuntime.MenuJobId,
+                ScriptName = $"Randomizer/Menu{mode}.lua"
+            });
+        }""")
+    replace("Login/Services/CharacterService.cs", "    private uint _characterCreationStage;", """    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS))]
+    private void ReceiveRandomizerChoice(GAME_5_PROTOCOL.MSG_MESSAGE_PROCESS message) {
+        var account = GetSocketAccount();
+        if (account is not null && message.JobID == Imlight.CoreLib.Game.RandomizerRuntime.MenuJobId &&
+            Imlight.CoreLib.Game.RandomizerRuntime.TryReadChoice(message.Message, out var mode)) {
+            Imlight.CoreLib.Game.RandomizerRuntime.SetMode(account.AccountId, mode);
+        }
+    }
+
+    private uint _characterCreationStage;""")
+    replace("Login/Services/GameTransitionService.cs", "        var msg = new SERVER_100_PROTOCOL.MSG_GETBESTSERVER();", """        if (Imlight.CoreLib.Game.RandomizerRuntime.Enabled) {
+            var mode = Imlight.CoreLib.Game.RandomizerRuntime.GetMode(GetSocketAccount().AccountId);
+            return AskServer<SERVER_100_PROTOCOL.MSG_SERVERINFO>(new SERVER_100_PROTOCOL.MSG_QUERYREALMSERVER {
+                RealmName = Imlight.CoreLib.Game.RandomizerRuntime.ModeName(mode)
+            });
+        }
+
+        var msg = new SERVER_100_PROTOCOL.MSG_GETBESTSERVER();""")
+    replace("Game/Zone/Core/ZoneEntity.cs", "        AutoAttachComponents();", """        Template = Imlight.CoreLib.Game.RandomizerRuntime.CreatureTemplate(
+            Template, ActiveGameObject?.m_templateID ?? 0, ZoneRef.Path.ToString());
+        AutoAttachComponents();""")
+    replace("Game/Zone/Core/ZoneEntity.cs", "            m_templateID = ActiveGameObject.m_templateID,", """            m_templateID = Imlight.CoreLib.Game.RandomizerRuntime.ClientCreatureId(
+                ActiveGameObject.m_templateID, ZoneRef.Path.ToString()),""")
+    replace("Game/Zone/Components/NpcComponent.cs", "    private StatsComponent _statsComponent;", """    private readonly Imlight.CoreLib.Game.CreatureRoll _randomizerRoll;
+    private StatsComponent _statsComponent;""")
+    replace("Game/Zone/Components/CombatDuelComponent.cs", "    public WizardClientDuelBehavior GetClientBehaviorInstance() => new() {", """    [MessageHandler(typeof(Imlight.CoreLib.Game.EnemyInspectorQuery))]
+    private void ReceiveInspectorQuery(Imlight.CoreLib.Game.EnemyInspectorQuery query) {
+        if (Duel is null || SubCircles is null) {
+            return;
+        }
+
+        var player = ActiveSubCircles.FirstOrDefault(circle => (ulong)circle.ParticipantObject.m_globalID == query.PlayerId);
+        if (player is null || Duel.m_duelPhase != kDuelPhase.kPhase_Planning) {
+            return;
+        }
+
+        Sender.Tell(new Imlight.CoreLib.Game.EnemyInspectorSnapshot(
+            Imlight.CoreLib.Game.EnemyInspectorData.PlanningCamera(Entity.ActiveGameObject.m_location,
+                Entity.ActiveGameObject.m_orientation.Z, player.SlotIndex)));
+        foreach (var circle in ActiveSubCircles.Where(circle => circle.OccupiedTeam != player.OccupiedTeam &&
+                     circle.IsAlive && !circle.CombatParticipant.m_isPlayer)) {
+            ulong templateId = Imlight.CoreLib.Game.RandomizerRuntime.ClientCreatureId(
+                circle.ParticipantObject.m_templateID, Entity.ZoneRef.Path.ToString());
+            var template = CoreObjectFactory.GetCoreTemplate(templateId) as GameObjectTemplate;
+            Sender.Tell(new Imlight.CoreLib.Game.EnemyInspectorSnapshot(
+                Imlight.CoreLib.Game.EnemyInspectorData.Snapshot(circle.ParticipantObject,
+                    template?.m_displayName ?? "", (MagicSchool)circle.CombatParticipant.m_primaryMagicSchoolID,
+                    circle.CombatParticipant.m_mobLevel, circle.ParticipantGameStats)));
+        }
+    }
+
+    public WizardClientDuelBehavior GetClientBehaviorInstance() => new() {""")
+    replace("Game/Zone/Components/NpcComponent.cs", "        this.StartingHealth = _npcBehaviorTemplate.m_nStartingHealth;", """        _randomizerRoll = _duelistBehaviorTemplate is null
+            ? new Imlight.CoreLib.Game.CreatureRoll(1, 1, 0, 0, 1)
+            : Imlight.CoreLib.Game.RandomizerRuntime.RollCreature(Entity.ZoneRef.Path.ToString());
+        this.StartingHealth = _randomizerRoll.ScaleHealth(_npcBehaviorTemplate.m_nStartingHealth);""")
+    replace("Game/Zone/Components/NpcComponent.cs", "        // If the NPC is a monster, it will have a deck.", """        if (IsMonster) {
+            Imlight.CoreLib.Game.CreatureRandomization.Apply(_statsComponent.Stats, _randomizerRoll);
+        }
+
+        // If the NPC is a monster, it will have a deck.""")
+    replace("Game/DropTables/LootGranter.cs", "        UpdateWizardGold(playerActor, wizard, results.GoldAmount);", """        Imlight.CoreLib.Game.RandomizerRuntime.RandomizeLoot(playerActor, wizard, results);
+        UpdateWizardGold(playerActor, wizard, results.GoldAmount);""")
+    replace("Game/Combat/CombatDeck.cs", "    private readonly byte _handSize;", """    private readonly byte _handSize;
+    private readonly int _randomizerMode;""")
+    replace("Game/Combat/CombatDeck.cs", "internal CombatDeck(List<CombatDeckSpellData> spellDatas, List<CombatDeckSpellData> treasureVault, byte handSize)",
+            "internal CombatDeck(List<CombatDeckSpellData> spellDatas, List<CombatDeckSpellData> treasureVault, byte handSize, int randomizerMode = 0)")
+    replace("Game/Combat/CombatDeck.cs", "        this._spellData = spellDatas;", """        this._randomizerMode = randomizerMode;
+        this._spellData = spellDatas.Select(card => new CombatDeckSpellData {
+            TemplateId = Imlight.CoreLib.Game.RandomizerRuntime.CombatSpellId(card.TemplateId, randomizerMode),
+            Quantity = card.Quantity,
+            IsBattleCard = card.IsBattleCard,
+            IsItemCard = card.IsItemCard,
+            IsTreasureCard = card.IsTreasureCard
+        }).ToList();""")
+    replace("Game/Combat/CombatDeck.cs", "        LastGivenHand.Add(spell);\n    }", """        uint templateId = Imlight.CoreLib.Game.RandomizerRuntime.CombatSpellId(spell.m_templateID, _randomizerMode);
+        if (!spell.m_treasureCard && templateId != spell.m_templateID) {
+            var replacement = SpellFactory.GetSpell(templateId);
+            replacement.m_itemCard = spell.m_itemCard;
+            replacement.m_battleCard = spell.m_battleCard;
+            spell = replacement;
+        }
+
+        LastGivenHand.Add(spell);
+    }""")
+    replace("Game/Combat/CombatDuelSubCircle.cs", "        _combatDeck = new CombatDeck(allSpells, vaultSpells, PLAYER_HAND_SIZE);", """        _combatDeck = new CombatDeck(allSpells, vaultSpells, PLAYER_HAND_SIZE,
+            Imlight.CoreLib.Game.RandomizerRuntime.GetMode(_wizard.AccountId));""")
+    replace("Game/Combat/CombatDuelSubCircle.cs", "        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE);", """        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE,
+            Imlight.CoreLib.Game.RandomizerRuntime.ModeForPath(ParticipantActor.Path.ToString()));""")
+
+
+
+if __name__ == "__main__":
+    main()
