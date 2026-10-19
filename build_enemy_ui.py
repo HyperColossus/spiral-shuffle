@@ -15,9 +15,9 @@ def native_color(rgb: str) -> str:
     return rgb[:2] + rgb[6:8] + rgb[4:6] + rgb[2:4]
 
 
-def add_parchment(panel: ET.Element, prototype: ET.Element) -> None:
-    positions_x = (0, 18, WIDTH - 18, WIDTH)
-    positions_y = (0, 18, HEIGHT - 18, HEIGHT)
+def add_parchment(panel: ET.Element, prototype: ET.Element, width: int = WIDTH, height: int = HEIGHT) -> None:
+    positions_x = (0, 18, width - 18, width)
+    positions_y = (0, 18, height - 18, height)
     texture_x = (0, 0.125, 0.875, 1)
     texture_y = (0, 0.25, 0.75, 1)
     for row in range(3):
@@ -71,12 +71,13 @@ def main() -> None:
     add_text(panel, text, "enemyHealth", "", "172,83,388,115", "0.60", "FF7A2424")
     add_text(panel, text, "enemySchool", "", "22,119,388,145", "0.46", "FF765427", True)
     for index, label in enumerate(("Damage", "Resistance", "Accuracy", "Pierce", "Critical", "Block"), 1):
-        top = 149 + (index - 1) * 24
+        top = 149 + (index - 1) * 22
         add_text(panel, text, f"enemyLabel{index}", label, f"22,{top},170,{top + 27}")
         add_text(panel, text, f"enemyValue{index}", "", f"172,{top},388,{top + 27}")
-    add_text(panel, text, "enemyPips", "", "22,298,388,322", "0.46")
-    add_text(panel, text, "enemyExtras", "", "22,321,388,345", "0.46")
-    add_text(panel, text, "enemyNote", "Scroll over enemy: next school", "22,346,388,367", "0.39", "FF705A3B")
+    add_text(panel, text, "enemyPips", "", "22,286,388,307", "0.46")
+    add_text(panel, text, "enemyExtras", "", "22,307,388,328", "0.46")
+    add_text(panel, text, "enemySpellDrop", "", "22,328,388,349", "0.46", "FF765427")
+    add_text(panel, text, "enemyNote", "Scroll over enemy: next school", "22,350,388,367", "0.39", "FF705A3B")
     ET.indent(document, space="    ")
     (ROOT / ".runtime/native/RandomizerEnemyInspector.gui").write_bytes(ET.tostring(document, encoding="utf-8"))
 

@@ -12,12 +12,12 @@ internal static class SpellStatRandomizer {
         return 1 + direction * width * magnitude;
     }
 
-    internal static void Apply(BindDocument document, SpellTemplate template, double multiplier) {
+    internal static void Apply(BindDocument document, SpellTemplate template, double multiplier, bool modifiers = false) {
         BindProperty effects = document.Value.Get<SpellTemplate>("m_effects");
-        document.Value.Set<SpellTemplate>("m_effects", ScaleEffects(effects, template.m_effects, multiplier));
+        document.Value.Set<SpellTemplate>("m_effects", ScaleEffects(effects, template.m_effects, multiplier, modifiers));
     }
 
-    private static BindProperty ScaleEffects(BindProperty property, IReadOnlyList<SpellEffect> effects, double multiplier) {
+    private static BindProperty ScaleEffects(BindProperty property, IReadOnlyList<SpellEffect> effects, double multiplier, bool modifiers) {
         List<BindObject> values = BindDocument.ReadVector(property);
         if (values.Count != effects.Count) {
             throw new InvalidDataException("Spell effect structure does not match its binary data.");
@@ -29,15 +29,15 @@ internal static class SpellStatRandomizer {
             switch (effect) {
                 case RandomSpellEffect random:
                     value.Set<RandomSpellEffect>("m_effectList", ScaleEffects(
-                        value.Get<RandomSpellEffect>("m_effectList"), random.m_effectList, multiplier));
+                        value.Get<RandomSpellEffect>("m_effectList"), random.m_effectList, multiplier, modifiers));
                     break;
                 case VariableSpellEffect variable:
                     value.Set<VariableSpellEffect>("m_effectList", ScaleEffects(
-                        value.Get<VariableSpellEffect>("m_effectList"), variable.m_effectList, multiplier));
+                        value.Get<VariableSpellEffect>("m_effectList"), variable.m_effectList, multiplier, modifiers));
                     break;
                 case EffectListSpellEffect list:
                     value.Set<EffectListSpellEffect>("m_effectList", ScaleEffects(
-                        value.Get<EffectListSpellEffect>("m_effectList"), list.m_effectList, multiplier));
+                        value.Get<EffectListSpellEffect>("m_effectList"), list.m_effectList, multiplier, modifiers));
                     break;
             }
 
@@ -45,6 +45,20 @@ internal static class SpellStatRandomizer {
                 kSpellEffects.kDamageOverTime or kSpellEffects.kHeal or kSpellEffects.kHealOverTime) {
                 ScaleParameter(value, "m_effectParam", effect.m_effectParam, multiplier);
                 ScaleParameter(value, "m_paramPerRound", effect.m_paramPerRound, multiplier);
+            }
+            else if (modifiers && effect.m_effectType is kSpellEffects.kModifyOutgoingDamage or
+                     kSpellEffects.kModifyIncomingDamage or kSpellEffects.kModifyAccuracy or
+                     kSpellEffects.kModifyOutgoingHeal or kSpellEffects.kModifyIncomingHeal) {
+                int amount = (int)Math.Clamp(Math.Round(effect.m_effectParam * multiplier), -95, 200);
+                if (amount == 0 && effect.m_effectParam != 0) {
+                    amount = Math.Sign(effect.m_effectParam);
+                }
+                BindProperty parameter = value.Get<SpellEffect>("m_effectParam");
+                value.Set<SpellEffect>("m_effectParam", parameter with { Data = BitConverter.GetBytes(amount) });
+            }
+            else if (modifiers && effect.m_effectType is kSpellEffects.kAbsorbDamage or
+                     kSpellEffects.kModifyOutgoingHealFlat or kSpellEffects.kModifyIncomingHealFlat) {
+                ScaleParameter(value, "m_effectParam", effect.m_effectParam, multiplier);
             }
         }
 

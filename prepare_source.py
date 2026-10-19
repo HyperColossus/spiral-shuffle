@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 from vendor_hooks import patch_vendor_hooks
+from spell_drop_hooks import patch_spell_drops
 
 
 ROOT = Path(__file__).resolve().parent
@@ -175,11 +176,15 @@ def main() -> None:
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")
     shutil.copy2(ROOT / "ServiceOptionRoutes.cs", SOURCE / "Game/ServiceOptionRoutes.cs")
+    shutil.copy2(ROOT / "SpellDrops.cs", SOURCE / "Game/SpellDrops.cs")
+    shutil.copy2(ROOT / "SpellDropRules.cs", SOURCE / "Game/SpellDropRules.cs")
+    shutil.copy2(ROOT / "SpellRewards.cs", SOURCE / "Game/SpellRewards.cs")
+    shutil.copy2(ROOT / "SpellRewardService.cs", SOURCE / "Game/Services/SpellRewardService.cs")
     shutil.copy2(ROOT / "CreatureRandomization.cs", SOURCE / "Game/CreatureRandomization.cs")
     shutil.copy2(ROOT / "EnemyInspectorService.cs", SOURCE / "Game/Services/EnemyInspectorService.cs")
     shutil.copy2(ROOT / "EnemyInspectorData.cs", SOURCE / "Game/EnemyInspectorData.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(EnemyInspectorService),")
-    replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId) {
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),")
+    replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
 
@@ -284,6 +289,7 @@ def main() -> None:
     replace("Game/Combat/CombatDuelSubCircle.cs", "        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE);", """        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE,
             Imlight.CoreLib.Game.RandomizerRuntime.ModeForPath(ParticipantActor.Path.ToString()));""")
     patch_vendor_hooks(replace)
+    patch_spell_drops(replace)
 
 
 if __name__ == "__main__":

@@ -169,6 +169,7 @@ def main() -> None:
     run(sys.executable, "extract_ui.py")
     run(sys.executable, "build_menu.py")
     run(sys.executable, "build_enemy_ui.py")
+    run(sys.executable, "build_reward_ui.py")
     run(sys.executable, "pack_assets.py")
     shutil.copy2(RUNTIME / "generated/catalog.json", SERVER / "Config/Randomizer.json")
     run(sys.executable, "verify_assets.py")
