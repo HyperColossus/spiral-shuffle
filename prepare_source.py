@@ -113,6 +113,54 @@ def patch_quest_flow() -> None:
         return true;""")
 
 
+def patch_world_state() -> None:
+    path = "Game/Zone/Components/RenderComponent.cs"
+    replace(path, """        var relevantDynaMods = wizard?.DynamodSet?.Dynamods?
+            .Where(d => d.ClientTag.Equals(Entity.Info?.m_zoneTag, System.StringComparison.OrdinalIgnoreCase))
+            .Where(d => string.IsNullOrEmpty(d.ZoneName)\x20
+                     || d.ZoneName.Equals(Entity.Zone.ZoneData.m_zoneName, System.StringComparison.OrdinalIgnoreCase))
+            .ToList() ?? [];
+        string persistedState = null;""", """        var relevantDynaMods = GetPlayerDynamods(wizard);""")
+    replace(path, """
+            if (!mod.ModState.Equals(SPAWN_STATE_NAME, System.StringComparison.OrdinalIgnoreCase)) {
+                persistedState = mod.ModState;
+            }
+""", "")
+    replace(path, """            // A dynamod state such as "IdleOpen" is only ever sent as a state change, so a player
+            // arriving in the zone has to be told again or the object reverts to its default.
+            if (persistedState is not null) {
+                Entity.ChangeStateExclusiveSender(persistedState, suspect);
+            }
+
+""", "")
+    replace(path, """        if (CreateCurrentStateMessage() is { } stateMsg) {
+            player.Tell(stateMsg);""", """        var wizard = _playersWithRequirementsMet.FirstOrDefault(pair => pair.Value.Equals(player)).Key;
+        if (CreateCurrentStateMessage(wizard) is { } stateMsg) {
+            player.Tell(stateMsg);""")
+    replace(path, """    private GAME_5_PROTOCOL.MSG_ENTERSTATE CreateCurrentStateMessage() {
+        var state = Entity.Zone.ScriptState.GetObjectState(Entity.Info?.m_zoneTag);""", """    private IEnumerable<Dynamod> GetPlayerDynamods(Wizard wizard)
+        => MatchingDynamods(wizard?.DynamodSet?.Dynamods, Entity.Zone.ZonePath,
+            Entity.Zone.ZoneData.m_zoneName, Entity.Info?.m_zoneTag);
+
+    internal static IEnumerable<Dynamod> MatchingDynamods(IEnumerable<Dynamod> mods,
+        string zonePath, string zoneName, string objectTag)
+        => (mods ?? []).Where(mod => mod is not null
+            && string.Equals(mod.ClientTag, objectTag, System.StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrEmpty(mod.ZoneName)
+                || string.Equals(mod.ZoneName, zonePath, System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(mod.ZoneName, zoneName, System.StringComparison.OrdinalIgnoreCase)));
+
+    internal static string ResolvePlayerState(IEnumerable<Dynamod> mods, string fallback) {
+        var mod = mods.LastOrDefault();
+        return mod is null || string.Equals(mod.ModState, SPAWN_STATE_NAME, System.StringComparison.OrdinalIgnoreCase)
+            ? fallback : mod.ModState;
+    }
+
+    private GAME_5_PROTOCOL.MSG_ENTERSTATE CreateCurrentStateMessage(Wizard wizard = null) {
+        var state = ResolvePlayerState(GetPlayerDynamods(wizard),
+            Entity.Zone.ScriptState.GetObjectState(Entity.Info?.m_zoneTag));""")
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -120,6 +168,7 @@ def main() -> None:
         if "\u2014" in content:
             path.write_text(content.replace("\u2014", ","), encoding="utf-8")
     patch_quest_flow()
+    patch_world_state()
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "CreatureRandomization.cs", SOURCE / "Game/CreatureRandomization.cs")

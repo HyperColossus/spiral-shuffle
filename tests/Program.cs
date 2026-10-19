@@ -81,6 +81,7 @@ internal static class Program {
         }
 
         checks += VerifyEnemyInspector(runtime.Assembly);
+        checks += WorldStateTests.Run(runtime.Assembly);
         Console.WriteLine($"Passed {checks} runtime checks: six mode choices, creature routing, individual stat bounds, spell variants, loot requirements, and enemy inspector values.");
         return 0;
     }

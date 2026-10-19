@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="WorldStateTests.cs" />
     <Compile Include="../CreatureRandomization.cs" Link="CreatureRandomization.cs" />
     <Reference Include="../server-build/bin/Release/net10.0/Imlight.CoreLib.dll" />
     <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" />
