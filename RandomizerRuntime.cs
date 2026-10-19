@@ -62,7 +62,12 @@ internal static class RandomizerRuntime {
     }
 
     internal static bool TryReadChoice(ByteString message, out int mode) {
+        return TryReadOptions(message, out mode, out _);
+    }
+
+    internal static bool TryReadOptions(ByteString message, out int mode, out bool vendors) {
         mode = 0;
+        vendors = false;
         if (!Enabled) {
             return false;
         }
@@ -80,11 +85,15 @@ internal static class RandomizerRuntime {
             }
 
             choice.Decode(new BitReader(raw[4..length]));
-            if (choice.gameName != "SpiralShuffle" || choice.score < 1 || choice.score > 6) {
+            int selectedMode = choice.score & 15;
+            bool selectedVendors = (choice.score & 16) != 0;
+            if (choice.gameName != "SpiralShuffle" || selectedMode < 1 || selectedMode > 6 ||
+                choice.score != selectedMode + (selectedVendors ? 16 : 0)) {
                 return false;
             }
 
-            mode = choice.score;
+            mode = selectedMode;
+            vendors = selectedVendors;
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException or IOException or OverflowException) {

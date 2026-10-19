@@ -1,6 +1,8 @@
 Include("API/ControlClasses.lua");
 
-local initialMode = INITIAL_MODE;
+local initialChoice = INITIAL_MODE;
+local randomVendors = initialChoice >= 16;
+local initialMode = initialChoice % 16;
 local mode = ((initialMode - 1) % 3) + 1;
 local shuffleCreatures = initialMode > 3;
 local names = {"Shuffle", "Chaos", "Nightmare"};
@@ -35,7 +37,8 @@ local function selectMode(value)
         or "A Lost Soul stays a Lost Soul. Each creature gets fresh stat rolls.";
     panel.FindNamedWindow("shuffleCreatures").SetLabel(creatureLabel);
     panel.FindNamedWindow("shuffleCreatureDescription").SetText("<center>" .. creatureDescription .. "</center>");
-    SendProcessMessage("MSG_MG2_REWARDS", {score = mode + (shuffleCreatures and 3 or 0), gameName = "SpiralShuffle"});
+    panel.FindNamedWindow("shuffleVendors").SetLabel("Randomize Vendors: " .. (randomVendors and "ON" or "OFF"));
+    SendProcessMessage("MSG_MG2_REWARDS", {score = mode + (shuffleCreatures and 3 or 0) + (randomVendors and 16 or 0), gameName = "SpiralShuffle"});
 end
 
 local function closeMenu(createWizard)
@@ -92,6 +95,9 @@ function main()
             end
             if event.Name == "shuffleCreatures" then
                 shuffleCreatures = not shuffleCreatures;
+                selectMode(mode);
+            elseif event.Name == "shuffleVendors" then
+                randomVendors = not randomVendors;
                 selectMode(mode);
             elseif event.Name == "shuffleNew" then
                 if closeMenu(true) then

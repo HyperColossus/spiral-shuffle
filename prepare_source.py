@@ -2,6 +2,8 @@
 import shutil
 from pathlib import Path
 
+from vendor_hooks import patch_vendor_hooks
+
 
 ROOT = Path(__file__).resolve().parent
 ORIGINAL = ROOT / ".build/upstream/Imlight-b07987168fcfa2d123a5d78df90ca0c76405e427/src/Imlight.CoreLib"
@@ -171,6 +173,8 @@ def main() -> None:
     patch_world_state()
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
+    shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")
+    shutil.copy2(ROOT / "ServiceOptionRoutes.cs", SOURCE / "Game/ServiceOptionRoutes.cs")
     shutil.copy2(ROOT / "CreatureRandomization.cs", SOURCE / "Game/CreatureRandomization.cs")
     shutil.copy2(ROOT / "EnemyInspectorService.cs", SOURCE / "Game/Services/EnemyInspectorService.cs")
     shutil.copy2(ROOT / "EnemyInspectorData.cs", SOURCE / "Game/EnemyInspectorData.cs")
@@ -279,7 +283,7 @@ def main() -> None:
             Imlight.CoreLib.Game.RandomizerRuntime.GetMode(_wizard.AccountId));""")
     replace("Game/Combat/CombatDuelSubCircle.cs", "        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE);", """        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE,
             Imlight.CoreLib.Game.RandomizerRuntime.ModeForPath(ParticipantActor.Path.ToString()));""")
-
+    patch_vendor_hooks(replace)
 
 
 if __name__ == "__main__":

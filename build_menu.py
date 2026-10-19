@@ -41,7 +41,7 @@ def main() -> None:
 
     rules_background = copy.deepcopy(background)
     set_value(rules_background, "m_sName", "shuffleRulesPaper")
-    set_value(rules_background, "m_Window", "496,352,870,604")
+    set_value(rules_background, "m_Window", "496,320,870,616")
     rules_background.find(".//m_sFilename").text = "GUI/paper_texture.dds"
     add_control(window, rules_background)
 
@@ -83,16 +83,18 @@ def main() -> None:
     text("shuffleStatus", f"<center>Selected: Shuffle | Seed: {seed}</center>", "58,436,442,478", "0.53")
     button("shuffleNew", "New Level 1 Wizard", "77,484,421,531", "0.63")
     button("shuffleContinue", "Choose My Wizard", "77,540,421,584", "0.63")
-    text("shuffleCreatureTitle", "<center>CREATURE RULES</center>", "501,366,861,405", "0.71", fancy=True)
-    button("shuffleCreatures", "Creature Stats Only", "507,415,855,466", "0.60")
-    text("shuffleCreatureDescription", "", "512,478,850,548", "0.57")
-    text("shuffleCreatureLimits", "<center>Extra resist: 0-5 / 12 / 20 points.<br>Accuracy: +/-5 / 10 / 15 points.<br>Existing crit and block ratings also vary.</center>", "512,550,850,599", "0.45")
+    text("shuffleCreatureTitle", "<center>WORLD RULES</center>", "501,329,861,369", "0.71", fancy=True)
+    button("shuffleCreatures", "Creature Stats Only", "507,374,855,421", "0.60")
+    text("shuffleCreatureDescription", "", "512,427,850,474", "0.51")
+    text("shuffleCreatureLimits", "<center>Stat ranges follow your difficulty.</center>", "512,476,850,499", "0.46")
+    button("shuffleVendors", "Randomize Vendors: OFF", "507,509,855,555", "0.59")
+    text("shuffleVendorDescription", "<center>Every wizard gets their own shop stock.<br>Rolls stay the same after reloading.</center>", "512,562,850,609", "0.49")
     text("shuffleTravel", "<center>Travel and spawn points stay fixed.</center>", "53,587,447,626", "0.48")
     OUTPUT.mkdir(parents=True, exist_ok=True)
     ET.indent(menu, space="    ")
     (OUTPUT / "RandomizerMenu.gui").write_bytes(ET.tostring(menu, encoding="utf-8"))
     script = (ROOT / "Menu.lua").read_text(encoding="utf-8")
-    for mode in range(1, 7):
+    for mode in [*range(1, 7), *range(17, 23)]:
         (OUTPUT / f"Menu{mode}.lua").write_text(script.replace("INITIAL_MODE", str(mode)).replace("SPIRAL-101", seed), encoding="utf-8")
 
 

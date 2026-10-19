@@ -43,13 +43,22 @@ def main() -> None:
     assert not any(name in changed for name in old if any(token in name.lower() for token in ("gateway", "worldhubzones", "zonetransfer", "spawnpoint")))
     gui = ET.parse(NATIVE / "RandomizerMenu.gui")
     controls = {element.findtext("m_sName") for element in gui.iter("Class")}
-    assert {"shuffleMode1", "shuffleMode2", "shuffleMode3", "shuffleNew", "shuffleContinue", "shuffleCreatures"} <= controls
+    assert {"shuffleMode1", "shuffleMode2", "shuffleMode3", "shuffleNew", "shuffleContinue", "shuffleCreatures", "shuffleVendors"} <= controls
+    for mode in [*range(1, 7), *range(17, 23)]:
+        name = f"Scripts/Randomizer/Menu{mode}.lua"
+        entry = new[name]
+        payload = read_payload(patched, entry.offset, entry.compressed_size if entry.compressed else entry.size)
+        script = zlib.decompress(payload) if entry.compressed else payload
+        assert script == (NATIVE / f"Menu{mode}.lua").read_bytes(), name
+        assert f"local initialChoice = {mode};".encode() in script, name
+        assert b"INITIAL_MODE" not in script and b'FindNamedWindow("shuffleVendors")' in script, name
     config = (SERVER / "Config/Imlight.ini").read_text()
     assert "RandomizeGateways = false" in config and "StartingLevel = 1" in config
     with original.open("rb") as stream:
         original_hash = hashlib.file_digest(stream, "sha256").hexdigest()
     report = {"UnchangedAssetsVerified": verified, "ModifiedAssetsCrcVerified": len(changed),
               "TravelAndSpawnAssetsUnchanged": True, "NativeMenuControlsVerified": True,
+              "MenuChoicesVerified": 12,
               "OriginalRootSha256": original_hash, "ModRootSha256": manifest["RootSha256"]}
     (GENERATED / "verification.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))

@@ -4,6 +4,8 @@ A Wizard101 randomizer for Revive101. Spells, gear stats, drops, and enemies get
 
 Travel and spawn points stay normal.
 
+Optional vendor shuffle gives each wizard their own random item and treasure-card stock, saved across reloads.
+
 ## Setup
 
 Windows, Python 3.12+, .NET 10 SDK, and a working Revive101 install with the full **r806919.Wizard_1_610** Aurorium files. Allow about 25 GB for the separate client.
