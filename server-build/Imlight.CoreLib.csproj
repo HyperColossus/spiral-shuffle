@@ -3,7 +3,6 @@
     <ImlightDirectory Condition="'$(ImlightDirectory)' == ''">$(MSBuildThisFileDirectory)../.runtime/server</ImlightDirectory>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Imlight.CoreLib</AssemblyName>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>annotations</Nullable>
@@ -26,4 +25,12 @@
     <Reference Include="$(ImlightDirectory)/Sparrow.dll" />
     <Reference Include="$(ImlightDirectory)/Microsoft.Extensions.ObjectPool.dll" />
   </ItemGroup>
+  <Target Name="MatchInstalledAssemblyVersion" BeforeTargets="GetAssemblyVersion">
+    <GetAssemblyIdentity AssemblyFiles="$(ImlightDirectory)/Imlight.CoreLib.dll">
+      <Output TaskParameter="Assemblies" ItemName="InstalledCoreLibrary" />
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <AssemblyVersion>%(InstalledCoreLibrary.Version)</AssemblyVersion>
+    </PropertyGroup>
+  </Target>
 </Project>
