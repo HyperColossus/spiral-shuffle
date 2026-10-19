@@ -164,6 +164,23 @@ def patch_world_state() -> None:
             Entity.Zone.ScriptState.GetObjectState(Entity.Info?.m_zoneTag));""")
 
 
+def patch_local_login() -> None:
+    replace("WizardData/DatabaseUtilities.cs", """        if (!sucess) {
+            return null;
+        }
+
+        return acc;""", """        if (!sucess) {
+            if (Imlight.CoreLib.Game.RandomizerRuntime.Enabled &&
+                Imlight.CoreLib.WizardData.Databases.PlayerDatabase.Instance.IsEmbedded &&
+                username == "admin" && !AccountCollection.ChangePassword(username, plaintextPassword)) {
+                throw new InvalidOperationException("Could not update the local randomizer login.");
+            }
+            return null;
+        }
+
+        return acc;""")
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -172,6 +189,7 @@ def main() -> None:
             path.write_text(content.replace("\u2014", ","), encoding="utf-8")
     patch_quest_flow()
     patch_world_state()
+    patch_local_login()
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")

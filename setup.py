@@ -78,8 +78,9 @@ def replace_setting(config: str, name: str, value: str) -> str:
 def configure_server(revive: Path) -> None:
     login_file = RUNTIME / "login.json"
     login = json.loads(login_file.read_text()) if login_file.exists() else {
-        "username": "admin", "password": secrets.token_urlsafe(18), "session_salt": secrets.token_hex(32)
+        "session_salt": secrets.token_hex(32)
     }
+    login.update(username="admin", password="compsci")
     config_directory = SERVER / "Config"
     config_directory.mkdir(exist_ok=True)
     template = UPSTREAM / "src/Imlight.Director/Config"
@@ -188,7 +189,7 @@ def main() -> None:
         return
     print("Copying the separate game client...", flush=True)
     install_client(revive, client)
-    print("Ready. Open Play.cmd. Your local login is in .runtime/login.txt.")
+    print("Ready. Open Play.cmd and sign in with admin / compsci.")
 
 
 if __name__ == "__main__":

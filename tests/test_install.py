@@ -1,4 +1,5 @@
 """Check that installation keeps server builds paired and preserves client files."""
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,46 @@ import setup as installer
 
 
 class ServerInstallTests(unittest.TestCase):
+    def test_setup_uses_standard_login_for_fresh_and_existing_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / "runtime"
+            server = runtime / "server"
+            server.mkdir(parents=True)
+            upstream = root / "upstream"
+            config = upstream / "src/Imlight.Director/Config"
+            config.mkdir(parents=True)
+            (config / "Imlight.ini").write_text("[Database]", encoding="utf-8")
+            (config / "akka.conf").write_text("port = 12999", encoding="utf-8")
+            save = runtime / "saves/player.db"
+            save.parent.mkdir()
+            save.write_bytes(b"saved wizard fixture")
+            for prior_login in (None, {"username": "admin", "password": "previous-random-password",
+                                       "session_salt": "existing-session-salt"}):
+                if prior_login is not None:
+                    (runtime / "login.json").write_text(json.dumps(prior_login), encoding="utf-8")
+                settings: dict[str, str] = {}
+
+                def capture_setting(content: str, name: str, value: str) -> str:
+                    settings[name] = value
+                    return content
+
+                with patch.object(installer, "RUNTIME", runtime), patch.object(installer, "SERVER", server), \
+                        patch.object(installer, "UPSTREAM", upstream), \
+                        patch.object(installer, "replace_setting", side_effect=capture_setting):
+                    installer.configure_server(root / "revive")
+                login = json.loads((runtime / "login.json").read_text(encoding="utf-8"))
+                self.assertEqual(login["username"], "admin")
+                self.assertEqual(login["password"], "compsci")
+                self.assertEqual(settings["AdminAccountUsername"], "admin")
+                self.assertEqual(settings["AdminAccountPassword"], "compsci")
+                self.assertIn("Username: admin\nPassword: compsci", (runtime / "login.txt").read_text())
+                self.assertEqual(save.read_bytes(), b"saved wizard fixture")
+                if prior_login is None:
+                    self.assertEqual(len(login["session_salt"]), 64)
+                else:
+                    self.assertEqual(login["session_salt"], prior_login["session_salt"])
+
     def test_replaces_launcher_and_library_without_overwriting_runtime_or_save(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
