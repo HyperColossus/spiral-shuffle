@@ -1,10 +1,40 @@
-"""Check that installing the client preserves the supplied files and skips preferences."""
+"""Check that installation keeps server builds paired and preserves client files."""
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import setup as installer
+
+
+class ServerInstallTests(unittest.TestCase):
+    def test_replaces_launcher_and_library_without_overwriting_runtime_or_save(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            server = root / ".runtime/server"
+            server.mkdir(parents=True)
+            output = root / "director-build/bin/Release/net10.0"
+            output.mkdir(parents=True)
+            for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
+                (server / name).write_bytes(b"incompatible installed assembly")
+                (output / name).write_bytes(b"matching rebuilt assembly")
+            preserved = {"Imlight.Director.exe": b"installed app host",
+                         "Imlight.Director.deps.json": b"installed dependency manifest",
+                         "Imlight.Director.runtimeconfig.json": b"installed runtime configuration",
+                         "Config/Imlight.ini": b"existing server settings", "Saves/player.db": b"saved wizard"}
+            for name, data in preserved.items():
+                path = server / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            with patch.object(installer, "ROOT", root), patch.object(installer, "SERVER", server), \
+                    patch.object(installer, "run") as build:
+                installer.build_server("dotnet")
+            build.assert_called_once_with("dotnet", "build", "director-build/Imlight.Director.csproj",
+                                          "-c", "Release", "-v", "quiet")
+            for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
+                self.assertEqual((server / name).read_bytes(), b"matching rebuilt assembly")
+            for name, data in preserved.items():
+                self.assertEqual((server / name).read_bytes(), data)
 
 
 class ClientInstallTests(unittest.TestCase):

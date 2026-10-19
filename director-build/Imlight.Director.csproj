@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ImlightDirectory Condition="'$(ImlightDirectory)' == ''">$(MSBuildThisFileDirectory)../.runtime/server</ImlightDirectory>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Imlight.Director</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+    <UseAppHost>false</UseAppHost>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../.build/upstream/Imlight-b07987168fcfa2d123a5d78df90ca0c76405e427/src/Imlight.Director/*.cs" />
+    <ProjectReference Include="../server-build/Imlight.CoreLib.csproj" />
+    <Reference Include="$(ImlightDirectory)/Imlight.Common.dll" />
+    <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" />
+    <Reference Include="$(ImlightDirectory)/Akka.dll" />
+    <Reference Include="$(ImlightDirectory)/Akka.Logger.Serilog.dll" />
+    <Reference Include="$(ImlightDirectory)/Akka.Remote.dll" />
+    <Reference Include="$(ImlightDirectory)/Raven.Client.dll" />
+  </ItemGroup>
+  <Target Name="MatchInstalledAssemblyVersion" BeforeTargets="GetAssemblyVersion">
+    <GetAssemblyIdentity AssemblyFiles="$(ImlightDirectory)/Imlight.Director.dll">
+      <Output TaskParameter="Assemblies" ItemName="InstalledDirector" />
+    </GetAssemblyIdentity>
+    <PropertyGroup>
+      <AssemblyVersion>%(InstalledDirector.Version)</AssemblyVersion>
+    </PropertyGroup>
+  </Target>
+</Project>
