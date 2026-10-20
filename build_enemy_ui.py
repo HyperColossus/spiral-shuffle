@@ -70,14 +70,14 @@ def main() -> None:
     add_text(panel, text, "healthLabel", "Health", "22,83,157,115", "0.60", "FF7A2424", True)
     add_text(panel, text, "enemyHealth", "", "172,83,388,115", "0.60", "FF7A2424")
     add_text(panel, text, "enemySchool", "", "22,119,388,145", "0.46", "FF765427", True)
-    for index, label in enumerate(("Damage", "Resistance", "Accuracy", "Pierce", "Critical", "Block"), 1):
+    for index, label in enumerate(("Outgoing dmg", "Resistance", "Accuracy adj.", "Pierce", "Crit. rating", "Block rating"), 1):
         top = 149 + (index - 1) * 22
         add_text(panel, text, f"enemyLabel{index}", label, f"22,{top},170,{top + 27}")
         add_text(panel, text, f"enemyValue{index}", "", f"172,{top},388,{top + 27}")
     add_text(panel, text, "enemyPips", "", "22,286,388,307", "0.46")
     add_text(panel, text, "enemyExtras", "", "22,307,388,328", "0.46")
     add_text(panel, text, "enemySpellDrop", "", "22,328,388,349", "0.46", "FF765427")
-    add_text(panel, text, "enemyNote", "Scroll over enemy: next school", "22,350,388,367", "0.39", "FF705A3B")
+    add_text(panel, text, "enemyNote", "Accuracy adjusts each card's hit chance", "22,350,388,367", "0.39", "FF705A3B")
     ET.indent(document, space="    ")
     (ROOT / ".runtime/native/RandomizerEnemyInspector.gui").write_bytes(ET.tostring(document, encoding="utf-8"))
 

@@ -181,6 +181,27 @@ def patch_local_login() -> None:
         return acc;""")
 
 
+def patch_combat_accuracy() -> None:
+    path = "Game/Combat/CombatResolver.cs"
+    replace(path, "var spellAccuracy = (int) spell.m_accuracy;", "double spellAccuracy = spell.m_accuracy;")
+    replace(path, """        // Convert to percentages for calculation
+        var totalIncrease = (percentIncrease + percentIncreaseAll) * 100;
+        var totalDecrease = (percentDecrease + percentDecreaseAll) * 100;
+
+        // Apply percentages to the spell accuracy
+        spellAccuracy *= (int) Math.Floor((1 + totalIncrease / 100.0) * (1 - totalDecrease / 100.0));""",
+            """        spellAccuracy = CombatAccuracy.FromStats(spell.m_accuracy,
+            percentIncrease + percentIncreaseAll, percentDecrease + percentDecreaseAll);""")
+    replace(path, "var hitChance = Random.Shared.Next(0, 100);", "var hitChance = Random.Shared.NextDouble();")
+    replace(path, "return hitChance <= spellAccuracy;", "return CombatAccuracy.Hits(spellAccuracy, hitChance);")
+    replace(path, "private static int ConsumeHangingAccuracyEffects(int startingAccuracy,",
+            "private static double ConsumeHangingAccuracyEffects(double startingAccuracy,")
+    replace(path, "            .Where(x => x.m_damageType == magicSchoolId);", """            .Where(x => x.m_damageType == magicSchoolId ||
+                string.Equals(x.m_sDamageType.ToString(), "All", StringComparison.OrdinalIgnoreCase)).ToArray();""")
+    replace(path, "            startingAccuracy += (int) Math.Floor(1 + effect.m_effectParam / 100.0);",
+            "            startingAccuracy += effect.m_effectParam;")
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -190,6 +211,8 @@ def main() -> None:
     patch_quest_flow()
     patch_world_state()
     patch_local_login()
+    patch_combat_accuracy()
+    shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")

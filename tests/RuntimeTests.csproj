@@ -14,6 +14,8 @@
     <Compile Include="ServiceRoutingTests.cs" />
     <Compile Include="SpellDropTests.cs" />
     <Compile Include="SpellRewardTests.cs" />
+    <Compile Include="CombatAccuracyTests.cs" />
+    <Compile Include="../CombatAccuracy.cs" Link="CombatAccuracy.cs" />
     <Compile Include="../SpellRewards.cs" Link="SpellRewards.cs" />
     <Compile Include="../SpellDropRules.cs" Link="SpellDropRules.cs" />
     <Compile Include="../CreatureRandomization.cs" Link="CreatureRandomization.cs" />

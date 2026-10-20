@@ -41,7 +41,8 @@ internal static class EnemyInspectorData {
             Number(Total(stats.m_dmgBonusFlat, stats.m_dmgBonusFlatAll, value)),
             Number(100 * Total(stats.m_dmgReducePercent, stats.m_dmgReducePercentAll, value)),
             Number(Total(stats.m_dmgReduceFlat, stats.m_dmgReduceFlatAll, value)),
-            Number(100 * Total(stats.m_accBonusPercent, stats.m_accBonusPercentAll, value)),
+            Number(100 * (Total(stats.m_accBonusPercent, stats.m_accBonusPercentAll, value) -
+                Total(stats.m_accReducePercent, stats.m_accReducePercentAll, value))),
             Number(100 * Total(stats.m_apBonusPercent, stats.m_apBonusPercentAll, value)),
             Number(Total(stats.m_criticalHitRatingBySchool, stats.m_criticalHitRatingAll, value)),
             Number(Total(stats.m_blockRatingBySchool, stats.m_blockRatingAll, value)),
