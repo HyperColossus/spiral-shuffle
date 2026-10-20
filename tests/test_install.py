@@ -60,7 +60,9 @@ class ServerInstallTests(unittest.TestCase):
                 (server / name).write_bytes(b"incompatible installed assembly")
                 (output / name).write_bytes(b"matching rebuilt assembly")
             preserved = {"Imlight.Director.exe": b"installed app host",
-                         "Imlight.Director.deps.json": b"installed dependency manifest",
+                         "Imlight.Director.deps.json": json.dumps({
+                             "runtimeTarget": {"name": ".NETCoreApp,Version=v10.0/win-x64"}
+                         }).encode(),
                          "Imlight.Director.runtimeconfig.json": b"installed runtime configuration",
                          "Config/Imlight.ini": b"existing server settings", "Saves/player.db": b"saved wizard"}
             for name, data in preserved.items():
@@ -68,10 +70,13 @@ class ServerInstallTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             with patch.object(installer, "ROOT", root), patch.object(installer, "SERVER", server), \
+                    patch.object(installer, "install_server_dependencies") as dependencies, \
                     patch.object(installer, "run") as build:
                 installer.build_server("dotnet")
             build.assert_called_once_with("dotnet", "build", "director-build/Imlight.Director.csproj",
-                                          "-c", "Release", "-v", "quiet")
+                                          "-c", "Release", "-v", "quiet", "-r", "win-x64", "--self-contained", "false",
+                                          "-p:AppendRuntimeIdentifierToOutputPath=false")
+            dependencies.assert_called_once_with(output)
             for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
                 self.assertEqual((server / name).read_bytes(), b"matching rebuilt assembly")
             for name, data in preserved.items():
