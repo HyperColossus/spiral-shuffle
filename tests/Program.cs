@@ -86,6 +86,7 @@ internal static class Program {
         checks += ServiceRoutingTests.Run(runtime.Assembly);
         checks += SpellDropTests.Run(runtime.Assembly, root);
         checks += SpellRewardTests.Run();
+        checks += CombatAccuracyTests.Run(runtime.Assembly);
         Console.WriteLine($"Passed {checks} runtime checks: six mode choices, creature routing, individual stat bounds, spell variants, loot requirements, and enemy inspector values.");
         return 0;
     }
@@ -205,13 +206,18 @@ internal static class Program {
         Equal("100", death[7]);
         Equal("0", death[9]);
         Equal(true, stats.m_dmgReducePercent is null);
+        stats.m_accReducePercentAll = 0.03f;
+        stats.m_accReducePercent = [0.02f];
+        fields = ((string)snapshot.Invoke(null, [creature, "name", MagicSchool.Death, 1, stats, 0])!).Split('|');
+        Equal("-9", fields[10].Split(';')[0].Split(',')[5]);
+        Equal("-7", fields[10].Split(';')[5].Split(',')[5]);
         fields = ((string)snapshot.Invoke(null, [creature, "name", MagicSchool.Death, 60, stats, 0])!).Split('|');
         Equal("OFF", fields[12]);
         Require(float.Parse(fields[10].Split(';')[0].Split(',')[9], System.Globalization.CultureInfo.InvariantCulture) > 0,
             "High level critical chance was omitted from the inspector.");
         Equal("Planning|10|20|30|0.12345679|1", camera.Invoke(null, [creature.m_location, 0.12345679f, 4]));
         Equal("Planning|10|20|30|0|-1", camera.Invoke(null, [creature.m_location, 0f, 0]));
-        return 18;
+        return 20;
     }
 
     private static void Require(bool condition, string message) {

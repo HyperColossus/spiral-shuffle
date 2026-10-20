@@ -99,9 +99,17 @@ local function updateText(enemy)
     local function value(index)
         return row[index] or "0";
     end
-    panel.FindNamedWindow("enemySchool").SetText((row[1] or enemy.school) .. " school stats");
-    local values = {value(2) .. "%  +" .. value(3) .. " flat", value(4) .. "%  +" .. value(5) .. " flat",
-        value(6) .. "%", value(7) .. "%", value(8) .. " (" .. value(10) .. "%)",
+    local function signed(index, suffix)
+        local amount = tonumber(value(index)) or 0;
+        return (amount > 0 and "+" or "") .. value(index) .. suffix;
+    end
+    local function flat(index)
+        return tonumber(value(index)) ~= 0 and (" " .. signed(index, " flat")) or "";
+    end
+    panel.FindNamedWindow("enemySchool").SetText((row[1] or enemy.school) .. " stats (scroll to change school)");
+    local damageType = (tonumber(value(2)) or 0) < 0 and " penalty" or " bonus";
+    local values = {signed(2, "%") .. damageType .. flat(3), signed(4, "%") .. flat(5),
+        signed(6, " points"), signed(7, "%"), value(8) .. " (" .. value(10) .. "%)",
         value(9) .. " (" .. value(11) .. "%)"};
     for index, text in ipairs(values) do
         panel.FindNamedWindow("enemyValue" .. index).SetText(text);
