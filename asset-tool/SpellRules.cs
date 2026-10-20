@@ -8,6 +8,10 @@ internal static class SpellRules {
                 RandomSpellEffect random => random.m_effectList,
                 VariableSpellEffect variable => variable.m_effectList,
                 EffectListSpellEffect list => list.m_effectList,
+                CountBasedSpellEffect count => count.m_effectList,
+                ConditionalSpellEffect conditional => conditional.m_elements.Select(element => element.m_pEffect),
+                TargetCountSpellEffect targetCount => targetCount.m_effectLists,
+                HangingConversionSpellEffect conversion => conversion.m_outputEffect,
                 _ => []
             };
             foreach (SpellEffect child in Effects(nested)) {

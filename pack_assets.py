@@ -129,7 +129,8 @@ def main() -> None:
     for mode in [*range(1, 7), *range(17, 23)]:
         overrides[f"Scripts/Randomizer/Menu{mode}.lua"] = (NATIVE / f"Menu{mode}.lua").read_bytes()
     forbidden = [name for name in overrides if name != "TemplateManifest.xml" and
-                 not name.startswith(("ObjectData/", "Spells/", "GUI/Randomizer", "Scripts/Randomizer/"))]
+                 not name.startswith(("ObjectData/", "Spells/", "GUI/Randomizer", "Scripts/Randomizer/")) and
+                 not (name.startswith("Locale/") and name.endswith("/Spell.lang") and name.count("/") == 2)]
     if forbidden:
         raise ValueError(f"Unexpected assets changed: {forbidden}")
     metadata = build_wad(BASE / "Data/GameData/Root.wad", OUTPUT / "Data/GameData/Root.wad", overrides)
