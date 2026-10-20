@@ -7,6 +7,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>annotations</Nullable>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../.build/source/**/*.cs" />
@@ -17,7 +18,7 @@
     <Reference Include="$(ImlightDirectory)/Raven.Client.dll" />
     <Reference Include="$(ImlightDirectory)/Raven.Embedded.dll" />
     <Reference Include="$(ImlightDirectory)/Newtonsoft.Json.dll" />
-    <Reference Include="$(ImlightDirectory)/LibGit2Sharp.dll" />
+    <PackageReference Include="LibGit2Sharp" Version="0.32.0" />
     <Reference Include="$(ImlightDirectory)/LiteDB.dll" />
     <Reference Include="$(ImlightDirectory)/Ionic.Zlib.Core.dll" />
     <Reference Include="$(ImlightDirectory)/BouncyCastle.Cryptography.dll" />

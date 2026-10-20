@@ -59,11 +59,59 @@ def copy_server(revive: Path) -> None:
                     ignore=shutil.ignore_patterns("*.log", "*.pfx", "*.pem", "*.key"))
 
 
+def install_server_dependencies(output: Path) -> None:
+    built = json.loads((output / "Imlight.Director.deps.json").read_text())
+    packages = {name: info for name, info in built["libraries"].items() if info["type"] == "package"}
+    versions = dict(name.rsplit("/", 1) for name in packages)
+    built_target = built["targets"][built["runtimeTarget"]["name"]]
+    package_entries = {name: built_target[name] for name in packages}
+    assets: set[Path] = set()
+    for entry in package_entries.values():
+        for section in ("runtime", "native", "runtimeTargets"):
+            for name in entry.get(section, {}):
+                relative = Path(name) if section == "runtimeTargets" else Path(name).name
+                assets.add(Path(relative))
+    for relative in assets:
+        require_file(output / relative)
+
+    manifest_path = SERVER / "Imlight.Director.deps.json"
+    installed = json.loads(manifest_path.read_text())
+    for target in installed["targets"].values():
+        for name in list(target):
+            if name.rsplit("/", 1)[0] in versions:
+                del target[name]
+        for name, entry in target.items():
+            dependencies = entry.get("dependencies", {})
+            for package, version in versions.items():
+                if package in dependencies or name.startswith("Imlight.CoreLib/"):
+                    dependencies[package] = version
+            if dependencies:
+                entry["dependencies"] = dependencies
+        target.update(package_entries)
+    libraries = installed["libraries"]
+    for name in list(libraries):
+        if name.rsplit("/", 1)[0] in versions:
+            del libraries[name]
+    libraries.update(packages)
+
+    for relative in sorted(assets):
+        destination = SERVER / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(output / relative, destination)
+    manifest_path.write_text(json.dumps(installed, indent=2), encoding="utf-8")
+
+
 def build_server(dotnet: str) -> None:
-    run(dotnet, "build", "director-build/Imlight.Director.csproj", "-c", "Release", "-v", "quiet")
+    arguments = [dotnet, "build", "director-build/Imlight.Director.csproj", "-c", "Release", "-v", "quiet"]
+    manifest = json.loads((SERVER / "Imlight.Director.deps.json").read_text())
+    _, separator, runtime_id = manifest["runtimeTarget"]["name"].partition("/")
+    if separator:
+        arguments.extend(["-r", runtime_id, "--self-contained", "false", "-p:AppendRuntimeIdentifierToOutputPath=false"])
+    run(*arguments)
     output = ROOT / "director-build/bin/Release/net10.0"
     for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
         require_file(output / name)
+    install_server_dependencies(output)
     for name in ("Imlight.CoreLib.dll", "Imlight.Director.dll"):
         shutil.copy2(output / name, SERVER / name)
 

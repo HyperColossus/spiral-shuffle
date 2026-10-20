@@ -19,7 +19,7 @@
     <Compile Include="../SpellRewards.cs" Link="SpellRewards.cs" />
     <Compile Include="../SpellDropRules.cs" Link="SpellDropRules.cs" />
     <Compile Include="../CreatureRandomization.cs" Link="CreatureRandomization.cs" />
-    <Reference Include="../server-build/bin/Release/net10.0/Imlight.CoreLib.dll" />
+    <ProjectReference Include="../server-build/Imlight.CoreLib.csproj" />
     <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" />
     <Reference Include="$(ImlightDirectory)/Imlight.Common.dll" />
     <Reference Include="$(ImlightDirectory)/Akka.dll" />
@@ -27,7 +27,6 @@
     <Reference Include="$(ImlightDirectory)/Raven.Client.dll" />
     <Reference Include="$(ImlightDirectory)/Raven.Embedded.dll" />
     <Reference Include="$(ImlightDirectory)/Newtonsoft.Json.dll" />
-    <Reference Include="$(ImlightDirectory)/LibGit2Sharp.dll" />
     <Reference Include="$(ImlightDirectory)/LiteDB.dll" />
     <Reference Include="$(ImlightDirectory)/Ionic.Zlib.Core.dll" />
     <Reference Include="$(ImlightDirectory)/BouncyCastle.Cryptography.dll" />
