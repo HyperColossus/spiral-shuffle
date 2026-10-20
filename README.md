@@ -4,7 +4,13 @@ A Wizard101 randomizer for Revive101. Spells, gear stats, drops, and enemies get
 
 Travel and spawn points stay normal.
 
+Spell numbers roll for attacks, drains, heals, blades, traps, shields, and enchants. Power ranges are 75-125% in Shuffle, 50-150% in Chaos, and 50-200% in Nightmare.
+
 Optional vendor shuffle gives each wizard their own random item and treasure-card stock, saved across reloads.
+
+Random Item Cards puts one random spell on every hat, robe, pair of boots, wand, athame, amulet, ring, and deck. Any school, with fresh number rolls for each piece. Turn it off to restore the usual item cards.
+
+Infinite Mana keeps your mana full, including after casting, marking a location, or fleeing. Toggle it in the book menu.
 
 Optional spell drops permanently teach new spells from creature kills. Type a rate from 0.1%-100% and press Set. Random mode rolls separate odds per enemy, usually low; Fixed uses your exact rate. Fixed at 100% guarantees a new spell per creature until you know them all. Hover to see the odds. A parchment popup reveals your cards after the fight.
 

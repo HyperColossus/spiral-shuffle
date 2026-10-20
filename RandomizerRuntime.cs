@@ -32,10 +32,15 @@ internal static class RandomizerRuntime {
         Data.Value.CreatureSwaps.ToDictionary(swap => (ulong)swap.From, swap => swap.Alias));
     private static readonly Lazy<Dictionary<(uint Original, int Difficulty), uint>> SpellVariants = new(() =>
         Data.Value.SpellVariants.ToDictionary(variant => (variant.Original, variant.Difficulty), variant => variant.TemplateId));
+    private static readonly Lazy<Dictionary<uint, uint>> SpellOriginals = new(() =>
+        Data.Value.SpellVariants.Where(variant => variant.TemplateId != variant.Original)
+            .ToDictionary(variant => variant.TemplateId, variant => variant.Original));
 
     internal static bool Enabled => File.Exists(CatalogPath);
 
     internal static IReadOnlyList<DropSpell> DropSpellPool => Data.Value.DropSpells;
+
+    internal static IReadOnlyList<EquipmentCard> EquipmentCardPool => Data.Value.EquipmentCards;
 
     internal static string ModeName(int mode) => CreatureRandomization.RealmName(mode);
 
@@ -139,8 +144,12 @@ internal static class RandomizerRuntime {
         : new CreatureRoll(1, 1, 0, 0, 1);
 
     internal static uint CombatSpellId(uint original, int mode) =>
-        Enabled && mode > 0 && SpellVariants.Value.TryGetValue((original, CreatureRandomization.Difficulty(mode)), out uint id)
+        Enabled && mode > 0 && SpellVariants.Value.TryGetValue((OriginalSpellId(original), CreatureRandomization.Difficulty(mode)), out uint id)
             ? id : original;
+
+    internal static uint OriginalSpellId(uint id) => Enabled ? SpellOriginals.Value.GetValueOrDefault(id, id) : id;
+
+    internal static bool IsSpellVariant(uint id) => Enabled && SpellOriginals.Value.ContainsKey(id);
 
     internal static void RandomizeLoot(IActorRef playerActor, Wizard wizard, DropTableResult results) {
         if (!Enabled) {
@@ -193,6 +202,7 @@ internal static class RandomizerRuntime {
         public List<CreatureSwap> CreatureSwaps { get; set; } = [];
         public List<SpellVariant> SpellVariants { get; set; } = [];
         public List<DropSpell> DropSpells { get; set; } = [];
+        public List<EquipmentCard> EquipmentCards { get; set; } = [];
     }
 
     private sealed class CreatureSwap {

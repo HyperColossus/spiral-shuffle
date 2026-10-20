@@ -46,6 +46,8 @@ def main() -> None:
     assert {"shuffleMode1", "shuffleMode2", "shuffleMode3", "shuffleNew", "shuffleContinue", "shuffleCreatures", "shuffleVendors"} <= controls
     assert {"shuffleSpellDrops", "shuffleDropLess", "shuffleDropMore", "shuffleDropRate"} <= controls
     assert {"shuffleDropMode", "shuffleDropInput", "shuffleDropApply"} <= controls
+    assert "shuffleItemCards" in controls
+    assert "shuffleInfiniteMana" in controls
     inspector = ET.parse(NATIVE / "RandomizerEnemyInspector.gui")
     assert "enemySpellDrop" in {element.findtext("m_sName") for element in inspector.iter("Class")}
     reward = ET.parse(NATIVE / "RandomizerSpellReward.gui")
@@ -65,6 +67,8 @@ def main() -> None:
         assert f"local initialChoice = {mode};".encode() in script, name
         assert b"INITIAL_MODE" not in script and b'FindNamedWindow("shuffleVendors")' in script, name
         assert b"SpiralSpellDrops" in script and b"shuffleSpellDrops" in script, name
+        assert b"SpiralItemCards" in script and b"shuffleItemCards" in script, name
+        assert b"SpiralInfiniteMana" in script and b"shuffleInfiniteMana" in script, name
     config = (SERVER / "Config/Imlight.ini").read_text()
     assert "RandomizeGateways = false" in config and "StartingLevel = 1" in config
     with original.open("rb") as stream:

@@ -87,6 +87,9 @@ internal static class Program {
         checks += SpellDropTests.Run(runtime.Assembly, root);
         checks += SpellRewardTests.Run();
         checks += CombatAccuracyTests.Run(runtime.Assembly);
+        checks += EquipmentItemCardTests.Run(runtime.Assembly, root);
+        checks += InfiniteManaTests.Run(runtime.Assembly);
+        checks += SpellNumberTests.Run(runtime.Assembly, root);
         Console.WriteLine($"Passed {checks} runtime checks: six mode choices, creature routing, individual stat bounds, spell variants, loot requirements, and enemy inspector values.");
         return 0;
     }

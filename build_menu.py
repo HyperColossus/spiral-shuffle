@@ -73,7 +73,7 @@ def main() -> None:
     descriptions = [
         ("Shuffle", "Enemy HP 80-120%. Spell power 75-125%."),
         ("Chaos", "Enemy HP 91-210%. Spell power 50-150%."),
-        ("Nightmare", "Enemy HP 113-394%. Spell power 25-200%."),
+        ("Nightmare", "Enemy HP 113-394%. Spell power 50-200%."),
     ]
     for index, (name, description) in enumerate(descriptions, 1):
         top = 146 + (index - 1) * 96
@@ -85,15 +85,17 @@ def main() -> None:
     button("shuffleContinue", "Choose My Wizard", "77,540,421,584", "0.63")
     text("shuffleCreatureTitle", "<center>WORLD RULES</center>", "501,66,861,110", "0.71", fancy=True)
     button("shuffleCreatures", "Creature Stats Only", "507,120,855,167", "0.60")
-    text("shuffleCreatureDescription", "", "512,174,850,224", "0.51")
-    button("shuffleVendors", "Randomize Vendors: OFF", "507,239,855,286", "0.59")
-    text("shuffleVendorDescription", "<center>Each wizard keeps their own shop rolls.</center>", "512,293,850,326", "0.49")
-    button("shuffleSpellDrops", "Spell Drops: OFF", "507,344,855,391", "0.61")
-    button("shuffleDropMode", "Odds: Random per enemy", "507,400,855,442", "0.53")
-    button("shuffleDropLess", "-", "507,452,557,494", "0.65")
+    text("shuffleCreatureDescription", "", "512,171,850,209", "0.47")
+    button("shuffleVendors", "Randomize Vendors: OFF", "507,216,855,257", "0.57")
+    text("shuffleVendorDescription", "<center>Each wizard keeps their own shop rolls.</center>", "512,260,850,282", "0.45")
+    button("shuffleItemCards", "Random Item Cards: OFF", "507,287,855,328", "0.57")
+    button("shuffleInfiniteMana", "Infinite Mana: OFF", "507,336,855,377", "0.57")
+    button("shuffleSpellDrops", "Spell Drops: OFF", "507,385,855,426", "0.59")
+    button("shuffleDropMode", "Odds: Random per enemy", "507,433,855,468", "0.51")
+    button("shuffleDropLess", "-", "507,478,557,515", "0.63")
     login = ET.parse(ROOT / ".build/research/GameLoginWindow.gui")
     edit = copy.deepcopy(next(node for node in login.iter("Class") if node.findtext("m_sName") == "loginName"))
-    for name, value in {"m_sName": "shuffleDropInput", "m_Window": "568,459,683,491", "m_Flags": "VISIBLE",
+    for name, value in {"m_sName": "shuffleDropInput", "m_Window": "568,483,683,513", "m_Flags": "VISIBLE",
                         "m_nMaxLength": "6", "m_sText": "1", "m_fMinRange": "0.1", "m_fMaxRange": "100"}.items():
         set_value(edit, name, value)
     style = edit.find("m_pWindowStyle/Class")
@@ -103,10 +105,10 @@ def main() -> None:
     style.find("m_pFont/Class/m_sFilename").text = "Fonts/WizardNormal.xml"
     style.find("m_pFont/Class/m_fScale").text = "0.64"
     add_control(window, edit)
-    text("shuffleDropRate", "%", "689,458,724,494", "0.58")
-    button("shuffleDropApply", "Set", "728,452,798,494", "0.50")
-    button("shuffleDropMore", "+", "804,452,855,494", "0.65")
-    text("shuffleDropHint", "", "512,503,850,565", "0.43")
+    text("shuffleDropRate", "%", "689,483,724,515", "0.56")
+    button("shuffleDropApply", "Set", "728,478,798,515", "0.48")
+    button("shuffleDropMore", "+", "804,478,855,515", "0.63")
+    text("shuffleDropHint", "", "512,519,850,565", "0.43")
     text("shuffleCreatureLimits", "<center>For every creature: Fixed + 100%.</center>", "512,574,850,611", "0.44")
     text("shuffleTravel", "<center>Travel and spawn points stay fixed.</center>", "53,587,447,626", "0.48")
     OUTPUT.mkdir(parents=True, exist_ok=True)

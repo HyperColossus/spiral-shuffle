@@ -4,6 +4,9 @@ from pathlib import Path
 
 from vendor_hooks import patch_vendor_hooks
 from spell_drop_hooks import patch_spell_drops
+from item_card_hooks import patch_item_cards
+from mana_hooks import patch_infinite_mana
+from spell_number_hooks import patch_spell_numbers
 
 
 ROOT = Path(__file__).resolve().parent
@@ -213,6 +216,10 @@ def main() -> None:
     patch_local_login()
     patch_combat_accuracy()
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
+    shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
+    shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
+    shutil.copy2(ROOT / "AccountToggleStore.cs", SOURCE / "Game/AccountToggleStore.cs")
+    shutil.copy2(ROOT / "SpellPresentation.cs", SOURCE / "Game/SpellPresentation.cs")
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")
@@ -331,6 +338,9 @@ def main() -> None:
             Imlight.CoreLib.Game.RandomizerRuntime.ModeForPath(ParticipantActor.Path.ToString()));""")
     patch_vendor_hooks(replace)
     patch_spell_drops(replace)
+    patch_item_cards(replace)
+    patch_infinite_mana(replace)
+    patch_spell_numbers(replace)
 
 
 if __name__ == "__main__":

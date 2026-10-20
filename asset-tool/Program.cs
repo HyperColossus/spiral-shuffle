@@ -41,6 +41,7 @@ internal static class Program {
                 dropSpellIds.Add(id);
             }
         }
+        HashSet<uint> shuffleSpellIds = new(playerSpells);
         Dictionary<string, WizardStatTable> statTables = archive.Files.Keys
             .Where(path => path.StartsWith("GameEffectRuleData/", StringComparison.Ordinal) && path.EndsWith(".xml"))
             .Select(path => Read<WizardStatTable>(archive, path)).OfType<WizardStatTable>()
@@ -56,6 +57,8 @@ internal static class Program {
         List<CreatureSwap> creatureSwaps = [];
         List<SpellVariant> spellVariants = [];
         List<DropSpellAsset> dropSpells = [];
+        List<EquipmentCardAsset> equipmentCards = [];
+        Dictionary<string, BindDocument> randomizedGear = [];
         BindDocument rawManifest = ReadBinary(archive, "TemplateManifest.xml");
         BindProperty locationProperty = rawManifest.Value.Get<TemplateManifest>("m_serializedTemplates");
         List<BindObject> rawLocations = BindDocument.ReadVector(locationProperty);
@@ -72,7 +75,7 @@ internal static class Program {
         using (ZipArchive zip = ZipFile.Open(zipPath, ZipArchiveMode.Create)) {
             foreach ((uint id, TemplateLocation location) in locations.OrderBy(pair => pair.Key)) {
                 string path = location.m_filename.ToString();
-                if (!path.StartsWith("ObjectData/", StringComparison.Ordinal) && !playerSpells.Contains(id)) {
+                if (!path.StartsWith("ObjectData/", StringComparison.Ordinal) && !path.StartsWith("Spells/", StringComparison.Ordinal)) {
                     continue;
                 }
 
@@ -85,7 +88,7 @@ internal static class Program {
                     continue;
                 }
 
-                if (template is SpellTemplate spell && playerSpells.Contains(id) && IsPlayerSpell(spell)) {
+                if (template is SpellTemplate spell && IsNumberedPlayerSpell(spell, path)) {
                     spells[id] = (spell, path);
                 }
 
@@ -119,6 +122,7 @@ internal static class Program {
                 path => ReadBinary(archive, path), key => Unit(seed, key));
             foreach ((string path, BindDocument document) in gearRandomizer.Build()) {
                 Write(zip, path, document);
+                randomizedGear.Add(path, document);
                 gearRolls++;
             }
 
@@ -132,21 +136,33 @@ internal static class Program {
                 }
             }
 
+            SpellDescriptions descriptions = new(archive);
+            dropSpells = BuildDropSpells(archive, locations, dropSpellIds, occupiedIds, rawLocations, locationRecords, zip, seed, descriptions);
+            EquipmentSpellSource[] itemCardSpells = dropSpells.Select(spell => new EquipmentSpellSource(spell.Original,
+                locations[spell.Original].m_filename, Read<SpellTemplate>(archive, locations[spell.Original].m_filename)!)).ToArray();
+            EquipmentCardBuilder itemCards = new(gear, randomizedGear, itemCardSpells,
+                path => ReadBinary(archive, path), key => Unit(seed, key), name => AllocateSpellName(name, occupiedIds));
+            foreach (EquipmentCardBuild build in itemCards.Build()) {
+                equipmentCards.Add(build.Card);
+                foreach (EquipmentCardFile file in build.Files) {
+                    if (build.Card.Spells.Contains(file.Id)) {
+                        descriptions.Apply(file.Document);
+                    }
+                    Write(zip, file.Path, file.Document);
+                    rawLocations.Add(AliasLocation(locationRecords[file.Prototype], file.Id, file.Path));
+                }
+            }
+
             foreach ((uint id, (SpellTemplate original, string path)) in spells.OrderBy(pair => pair.Key)) {
-                string role = SpellRules.Role(original);
-                if (role == "protected") {
-                    continue;
-                }
-
-                var candidates = spells.Where(pair => pair.Key != id &&
-                    (!playerSpells.Contains(id) || playerSpells.Contains(pair.Key)) &&
-                    SpellRules.Compatible(original, pair.Value.Template))
-                    .OrderBy(pair => pair.Key).ToArray();
-                if (candidates.Length == 0) {
-                    continue;
-                }
-
-                var chosen = candidates[(int)(Unit(seed, $"spell:{id}") * candidates.Length)];
+                var candidates = (shuffleSpellIds.Contains(id) || itemSpellNames.Contains(original.m_name)) &&
+                    IsPlayerSpell(original) && SpellRules.Role(original) != "protected"
+                    ? spells.Where(pair => pair.Key != id && (shuffleSpellIds.Contains(pair.Key) || itemSpellNames.Contains(pair.Value.Template.m_name)) && IsPlayerSpell(pair.Value.Template) &&
+                        (!shuffleSpellIds.Contains(id) || shuffleSpellIds.Contains(pair.Key)) &&
+                        SpellRules.Compatible(original, pair.Value.Template)).OrderBy(pair => pair.Key).ToArray()
+                    : [];
+                var chosen = candidates.Length == 0
+                    ? new KeyValuePair<uint, (SpellTemplate Template, string Path)>(id, (original, path))
+                    : candidates[(int)(Unit(seed, $"spell:{id}") * candidates.Length)];
                 BindDocument replacement = ReadBinary(archive, path);
                 BindDocument donorSpell = ReadBinary(archive, chosen.Value.Path);
                 foreach (string property in new[] {
@@ -160,7 +176,7 @@ internal static class Program {
                 for (int difficulty = 1; difficulty <= 3; difficulty++) {
                     double multiplier = SpellStatRandomizer.Multiplier(difficulty, Unit(seed, $"spell-stats:{id}"));
                     BindDocument variant = BindDocument.Read(replacement.Encode());
-                    SpellStatRandomizer.Apply(variant, chosen.Value.Template, multiplier);
+                    SpellStatRandomizer.Apply(variant, chosen.Value.Template, multiplier, true);
                     uint variantId = id;
                     string variantPath = path;
                     if (difficulty > 1) {
@@ -177,11 +193,14 @@ internal static class Program {
                         rawLocations.Add(AliasLocation(locationRecords[id], variantId, variantPath));
                     }
 
+                    descriptions.Apply(variant);
                     Write(zip, variantPath, variant);
                     spellVariants.Add(new(id, difficulty, variantId, multiplier));
                 }
 
-                spellSwaps.Add(new(id, chosen.Key, original.m_name.ToString(), chosen.Value.Template.m_name.ToString()));
+                if (chosen.Key != id) {
+                    spellSwaps.Add(new(id, chosen.Key, original.m_name.ToString(), chosen.Value.Template.m_name.ToString()));
+                }
             }
 
             foreach (Creature original in creatures) {
@@ -235,17 +254,19 @@ internal static class Program {
                 creatureSwaps.Add(new(original.Id, donor.Id, original.Name, donor.Name, alias));
             }
 
-            dropSpells = BuildDropSpells(archive, locations, dropSpellIds, occupiedIds, rawLocations, locationRecords, zip, seed);
+            descriptions.Write(zip);
             rawManifest.Value.Set<TemplateManifest>("m_serializedTemplates", BindDocument.WriteVector(locationProperty, rawLocations));
             Write(zip, "TemplateManifest.xml", rawManifest);
         }
 
         File.WriteAllText(Path.Combine(output, "catalog.json"), JsonSerializer.Serialize(new {
             Seed = seed, Creatures = creatures, Equipment = equipment, SpellSwaps = spellSwaps, CreatureSwaps = creatureSwaps,
-            SpellVariants = spellVariants, DropSpells = dropSpells, GearRolls = gearRolls, RejectedTemplates = rejected,
+            SpellVariants = spellVariants, DropSpells = dropSpells, EquipmentCards = equipmentCards,
+            GearRolls = gearRolls, RejectedTemplates = rejected,
         }, JsonOptions));
         Console.WriteLine($"Built {spellSwaps.Count} spell swaps, {gearRolls} gear rolls, " +
-            $"{creatureSwaps.Count} creature swaps, {equipment.Count} loot candidates, {dropSpells.Count} spell-drop candidates.");
+            $"{creatureSwaps.Count} creature swaps, {equipment.Count} loot candidates, {dropSpells.Count} spell-drop candidates, " +
+            $"{equipmentCards.Count} equipment item-card rolls.");
         return 0;
     }
 
@@ -257,6 +278,17 @@ internal static class Program {
         return nextAlias++;
     }
 
+    private static (uint Id, string Name) AllocateSpellName(string name, ISet<uint> occupiedIds) {
+        string candidate = name;
+        uint id = StringHash.Compute(candidate);
+        for (int suffix = 1; !occupiedIds.Add(id); suffix++) {
+            candidate = $"{name}_{suffix}";
+            id = StringHash.Compute(candidate);
+        }
+
+        return (id, candidate);
+    }
+
     private static BindObject AliasLocation(BindObject source, uint id, string path) {
         BindObject result = BindObject.Read(source.Encode());
         result.Set<TemplateLocation>("m_id", result.Get<TemplateLocation>("m_id").WithUnsigned(id));
@@ -266,7 +298,7 @@ internal static class Program {
 
     private static List<DropSpellAsset> BuildDropSpells(Archive archive, Dictionary<uint, TemplateLocation> locations,
         HashSet<uint> playerSpells, HashSet<uint> occupiedIds, List<BindObject> rawLocations,
-        Dictionary<uint, BindObject> locationRecords, ZipArchive zip, string seed) {
+        Dictionary<uint, BindObject> locationRecords, ZipArchive zip, string seed, SpellDescriptions descriptions) {
         List<DropSpellAsset> result = [];
         HashSet<(string School, string Name)> seen = [];
         foreach (uint originalId in playerSpells.Order()) {
@@ -301,6 +333,7 @@ internal static class Program {
                 double multiplier = SpellStatRandomizer.Multiplier(difficulty, Unit(seed, $"drop-stats:{originalId}"));
                 SpellStatRandomizer.Apply(variant, spell, multiplier, true);
                 string path = $"ObjectData/Randomizer/DropSpell{id}.xml";
+                descriptions.Apply(variant);
                 Write(zip, path, variant);
                 rawLocations.Add(AliasLocation(locationRecords[originalId], id, path));
                 variants[difficulty - 1] = id;
@@ -317,6 +350,13 @@ internal static class Program {
     private static bool IsServiceBehavior(string name) =>
         new[] { "Shop", "Trainer", "Vendor", "Quest", "Service", "Minigame", "Teleport", "Pet" }
             .Any(part => name.Contains(part, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsNumberedPlayerSpell(SpellTemplate spell, string path) =>
+        !spell.m_Treasure && !spell.m_PvP && !spell.m_battlegroundsOnly && !spell.m_alwaysFizzle &&
+        !new[] { "MOB", "Boss", "Test", "CHEAT", "QA_", "BG_", "Debug", "100K" }
+            .Any(token => spell.m_name.ToString().Contains(token, StringComparison.OrdinalIgnoreCase)) &&
+        !new[] { "Battleground", "Fight Specific", "/Mobs/", "CombatTrigger", "Minion Specific" }
+            .Any(token => path.Contains(token, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsPlayerSpell(SpellTemplate spell) => !spell.m_Treasure && !spell.m_PvP &&
         !spell.m_battlegroundsOnly && !spell.m_alwaysFizzle && !spell.m_spellRank.m_xPipSpell &&

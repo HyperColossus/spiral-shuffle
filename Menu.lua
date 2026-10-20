@@ -7,11 +7,25 @@ local mode = ((initialMode - 1) % 3) + 1;
 local shuffleCreatures = initialMode > 3;
 local dropSetting = -100;
 local dropSettingsReady = false;
+local randomItemCards = false;
+local itemCardSettingsReady = false;
+local infiniteMana = false;
+local manaSettingsReady = false;
 local dropRates = {10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000};
 local names = {"Shuffle", "Chaos", "Nightmare"};
 local panel = nil;
 local characterSelect = nil;
 local events = {"WB_BUTTONUP", "GM_MOUSEBTNUP", "GM_MOUSEBTNDOWN", "GM_KEYUP", "MSG_MG2_REWARDS"};
+
+local function updateItemCardSettings()
+    local label = itemCardSettingsReady and (randomItemCards and "ON" or "OFF") or "Loading";
+    panel.FindNamedWindow("shuffleItemCards").SetLabel("Random Item Cards: " .. label);
+end
+
+local function updateManaSettings()
+    local label = manaSettingsReady and (infiniteMana and "ON" or "OFF") or "Loading";
+    panel.FindNamedWindow("shuffleInfiniteMana").SetLabel("Infinite Mana: " .. label);
+end
 
 local function fixedDrops()
     return math.abs(dropSetting) >= 100000;
@@ -139,7 +153,11 @@ function main()
     Log("Spiral Shuffle: menu attached to character selection.");
     selectMode(mode);
     updateDropSettings();
+    updateItemCardSettings();
+    updateManaSettings();
     SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralSpellDrops"});
+    SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralItemCards"});
+    SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralInfiniteMana"});
     local settingsWait = 0;
     while true do
         local event = GetEvent("", false);
@@ -155,6 +173,22 @@ function main()
                 updateDropSettings();
             end
         end
+        if event and event.MsgName == "MSG_MG2_REWARDS" and event.gameName == "SpiralItemCards" then
+            local setting = tonumber(event.score);
+            if setting == 1 or setting == -1 then
+                randomItemCards = setting > 0;
+                itemCardSettingsReady = true;
+                updateItemCardSettings();
+            end
+        end
+        if event and event.MsgName == "MSG_MG2_REWARDS" and event.gameName == "SpiralInfiniteMana" then
+            local setting = tonumber(event.score);
+            if setting == 1 or setting == -1 then
+                infiniteMana = setting > 0;
+                manaSettingsReady = true;
+                updateManaSettings();
+            end
+        end
         if event and event.EventName == "WB_BUTTONUP" then
             for index = 1, 3 do
                 if event.Name == "shuffleMode" .. index then
@@ -167,6 +201,10 @@ function main()
             elseif event.Name == "shuffleVendors" then
                 randomVendors = not randomVendors;
                 selectMode(mode);
+            elseif event.Name == "shuffleItemCards" and itemCardSettingsReady then
+                SendProcessMessage("MSG_MG2_REWARDS", {score = randomItemCards and -2 or 2, gameName = "SpiralItemCards"});
+            elseif event.Name == "shuffleInfiniteMana" and manaSettingsReady then
+                SendProcessMessage("MSG_MG2_REWARDS", {score = infiniteMana and -2 or 2, gameName = "SpiralInfiniteMana"});
             elseif event.Name == "shuffleSpellDrops" and dropSettingsReady then
                 dropSetting = -dropSetting;
                 saveDropSettings();
@@ -195,6 +233,12 @@ function main()
         settingsWait = settingsWait + 1;
         if not dropSettingsReady and settingsWait % 50 == 0 then
             SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralSpellDrops"});
+        end
+        if not itemCardSettingsReady and settingsWait % 50 == 0 then
+            SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralItemCards"});
+        end
+        if not manaSettingsReady and settingsWait % 50 == 0 then
+            SendProcessMessage("MSG_MG2_REWARDS", {score = 0, gameName = "SpiralInfiniteMana"});
         end
         Sleep(0.02);
     end
