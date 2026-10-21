@@ -42,6 +42,7 @@ class ServerInstallTests(unittest.TestCase):
                 self.assertEqual(login["password"], "compsci")
                 self.assertEqual(settings["AdminAccountUsername"], "admin")
                 self.assertEqual(settings["AdminAccountPassword"], "compsci")
+                self.assertEqual(settings["DefaultItems"], "87256,284071,126983")
                 self.assertIn("Username: admin\nPassword: compsci", (runtime / "login.txt").read_text())
                 self.assertEqual(save.read_bytes(), b"saved wizard fixture")
                 if prior_login is None:

@@ -87,7 +87,8 @@ internal static class VendorRandomization {
     private static readonly ConcurrentDictionary<(ulong Wizard, ulong Vendor), TreasureCardEntry[]> CardRolls = new();
     private static readonly Lazy<GID[]> ItemPool = new(() => SpiralDB.NpcInventories.Values
         .SelectMany(shop => shop.Inventory).DistinctBy(item => item.MParts.TemplateId)
-        .Where(item => CoreObjectFactory.GetCoreTemplate(item.MParts.TemplateId) is WizItemTemplate)
+        .Where(item => !QaGear.IsQa(item.MParts.TemplateId) &&
+            CoreObjectFactory.GetCoreTemplate(item.MParts.TemplateId) is WizItemTemplate)
         .OrderBy(item => item.MParts.TemplateId).ToArray());
     private static readonly Lazy<TreasureCardEntry[]> CardPool = new(() => SpellFactory.GetTreasureCardTemplates()
         .Where(card => card.m_baseCost > 0 && card.m_effects is { Count: > 0 } &&
@@ -106,6 +107,9 @@ internal static class VendorRandomization {
     }
 
     internal static List<GID> Items(Wizard wizard, ulong vendorId, IReadOnlyList<GID> original) {
+        if (RandomizerRuntime.Enabled) {
+            original = original.Where(item => !QaGear.IsQa(item.MParts.TemplateId)).ToArray();
+        }
         if (!IsEnabled(wizard.AccountId) || ItemPool.Value.Length == 0) {
             return original.ToList();
         }

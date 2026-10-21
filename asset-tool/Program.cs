@@ -42,6 +42,7 @@ internal static class Program {
             }
         }
         HashSet<uint> shuffleSpellIds = new(playerSpells);
+        HashSet<uint> trainerSpellIds = TrainerSpells(root);
         Dictionary<string, WizardStatTable> statTables = archive.Files.Keys
             .Where(path => path.StartsWith("GameEffectRuleData/", StringComparison.Ordinal) && path.EndsWith(".xml"))
             .Select(path => Read<WizardStatTable>(archive, path)).OfType<WizardStatTable>()
@@ -153,16 +154,14 @@ internal static class Program {
                 }
             }
 
+            ShuffleSpell[] shuffleSources = spells.Where(pair =>
+                (shuffleSpellIds.Contains(pair.Key) || itemSpellNames.Contains(pair.Value.Template.m_name)) &&
+                IsPlayerSpell(pair.Value.Template) && SpellRules.Role(pair.Value.Template) != "protected")
+                .Select(pair => new ShuffleSpell(pair.Key, pair.Value.Template)).ToArray();
+            Dictionary<uint, uint> shufflePlan = SpellShufflePlan.Build(shuffleSources, trainerSpellIds, key => Unit(seed, key));
             foreach ((uint id, (SpellTemplate original, string path)) in spells.OrderBy(pair => pair.Key)) {
-                var candidates = (shuffleSpellIds.Contains(id) || itemSpellNames.Contains(original.m_name)) &&
-                    IsPlayerSpell(original) && SpellRules.Role(original) != "protected"
-                    ? spells.Where(pair => pair.Key != id && (shuffleSpellIds.Contains(pair.Key) || itemSpellNames.Contains(pair.Value.Template.m_name)) && IsPlayerSpell(pair.Value.Template) &&
-                        (!shuffleSpellIds.Contains(id) || shuffleSpellIds.Contains(pair.Key)) &&
-                        SpellRules.Compatible(original, pair.Value.Template)).OrderBy(pair => pair.Key).ToArray()
-                    : [];
-                var chosen = candidates.Length == 0
-                    ? new KeyValuePair<uint, (SpellTemplate Template, string Path)>(id, (original, path))
-                    : candidates[(int)(Unit(seed, $"spell:{id}") * candidates.Length)];
+                uint donorId = shufflePlan.GetValueOrDefault(id, id);
+                var chosen = new KeyValuePair<uint, (SpellTemplate Template, string Path)>(donorId, spells[donorId]);
                 BindDocument replacement = ReadBinary(archive, path);
                 BindDocument donorSpell = ReadBinary(archive, chosen.Value.Path);
                 foreach (string property in new[] {
@@ -180,6 +179,7 @@ internal static class Program {
                     uint variantId = id;
                     string variantPath = path;
                     if (difficulty > 1) {
+                        variant = SpellCardAssets.Independent(variant);
                         string variantName = $"SpiralShuffle{difficulty}_{id}";
                         variantId = StringHash.Compute(variantName);
                         for (int suffix = 1; !occupiedIds.Add(variantId); suffix++) {
@@ -262,6 +262,7 @@ internal static class Program {
         File.WriteAllText(Path.Combine(output, "catalog.json"), JsonSerializer.Serialize(new {
             Seed = seed, Creatures = creatures, Equipment = equipment, SpellSwaps = spellSwaps, CreatureSwaps = creatureSwaps,
             SpellVariants = spellVariants, DropSpells = dropSpells, EquipmentCards = equipmentCards,
+            TrainerSpellSchools = spells.ToDictionary(pair => pair.Key, pair => pair.Value.Template.m_sMagicSchoolName.ToString()),
             GearRolls = gearRolls, RejectedTemplates = rejected,
         }, JsonOptions));
         Console.WriteLine($"Built {spellSwaps.Count} spell swaps, {gearRolls} gear rolls, " +
@@ -328,7 +329,7 @@ internal static class Program {
                     id = StringHash.Compute(name);
                 }
 
-                BindDocument variant = ReadBinary(archive, location.m_filename);
+                BindDocument variant = SpellCardAssets.Independent(ReadBinary(archive, location.m_filename));
                 variant.Value.Set<SpellTemplate>("m_name", variant.Value.Get<SpellTemplate>("m_name").WithString(name));
                 double multiplier = SpellStatRandomizer.Multiplier(difficulty, Unit(seed, $"drop-stats:{originalId}"));
                 SpellStatRandomizer.Apply(variant, spell, multiplier, true);
@@ -372,7 +373,7 @@ internal static class Program {
             .Select(requirement => (int)requirement.m_numericValue).DefaultIfEmpty(0).Max();
     }
 
-    private static HashSet<uint> PlayerSpells(string root) {
+    private static HashSet<uint> TrainerSpells(string root) {
         HashSet<uint> ids = [];
         foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "Imlight/spiraldb-cache/NpcSpellInventory"), "*.json")) {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(file), JsonReadOptions);
@@ -381,6 +382,11 @@ internal static class Program {
             }
         }
 
+        return ids;
+    }
+
+    private static HashSet<uint> PlayerSpells(string root) {
+        HashSet<uint> ids = TrainerSpells(root);
         foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "Imlight/spiraldb-cache/QuestTemplates"), "*.json")) {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(file), JsonReadOptions);
             AddQuestSpells(document.RootElement, ids);

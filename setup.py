@@ -144,7 +144,7 @@ def configure_server(revive: Path) -> None:
         "SpiralDBLocalPath": (revive / "Imlight/spiraldb-cache").as_posix(),
         "SpiralDBAutoFetch": "false", "SpiralDBDisableRemote": "true", "LocalWadCachePath": "./cache",
         "RandomizeCreatures": "false", "RandomizeGateways": "false", "RandomBackflips": "false",
-        "StartingLevel": "1", "TutorialDisabled": "false", "LogLevel": "INFO",
+        "StartingLevel": "1", "TutorialDisabled": "false", "DefaultItems": "87256,284071,126983", "LogLevel": "INFO",
         "AdminAccountUsername": login["username"], "AdminAccountPassword": login["password"],
         "SessionKeyHashInput": login["session_salt"],
     }

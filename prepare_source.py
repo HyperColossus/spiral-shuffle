@@ -7,6 +7,9 @@ from spell_drop_hooks import patch_spell_drops
 from item_card_hooks import patch_item_cards
 from mana_hooks import patch_infinite_mana
 from spell_number_hooks import patch_spell_numbers
+from creature_ai_hooks import patch_creature_ai
+from trainer_hooks import patch_trainers
+from qa_gear_hooks import patch_qa_gear
 
 
 ROOT = Path(__file__).resolve().parent
@@ -220,6 +223,10 @@ def main() -> None:
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
     shutil.copy2(ROOT / "AccountToggleStore.cs", SOURCE / "Game/AccountToggleStore.cs")
     shutil.copy2(ROOT / "SpellPresentation.cs", SOURCE / "Game/SpellPresentation.cs")
+    shutil.copy2(ROOT / "SpellEffectFilter.cs", SOURCE / "Game/Spells/SpellEffectFilter.cs")
+    shutil.copy2(ROOT / "TrainerRules.cs", SOURCE / "Game/TrainerRules.cs")
+    shutil.copy2(ROOT / "QaGear.cs", SOURCE / "Game/QaGear.cs")
+    shutil.copy2(ROOT / "InteractTrainerComponent.cs", SOURCE / "Game/Zone/Components/InteractTrainerComponent.cs")
     shutil.copy2(ROOT / "WorldTeleportDoorComponent.cs", SOURCE / "Game/Zone/Components/WorldTeleportDoorComponent.cs")
     shutil.copy2(ROOT / "RandomizerRuntime.cs", SOURCE / "Game/RandomizerRuntime.cs")
     shutil.copy2(ROOT / "VendorRandomization.cs", SOURCE / "Game/VendorRandomization.cs")
@@ -341,6 +348,9 @@ def main() -> None:
     patch_item_cards(replace)
     patch_infinite_mana(replace)
     patch_spell_numbers(replace)
+    patch_creature_ai(replace)
+    patch_trainers(replace)
+    patch_qa_gear(replace)
 
 
 if __name__ == "__main__":

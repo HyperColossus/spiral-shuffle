@@ -151,6 +151,9 @@ internal static class RandomizerRuntime {
 
     internal static bool IsSpellVariant(uint id) => Enabled && SpellOriginals.Value.ContainsKey(id);
 
+    internal static string TrainerSpellSchool(uint id, string fallback) =>
+        Enabled ? Data.Value.TrainerSpellSchools.GetValueOrDefault(OriginalSpellId(id), fallback) : fallback;
+
     internal static void RandomizeLoot(IActorRef playerActor, Wizard wizard, DropTableResult results) {
         if (!Enabled) {
             return;
@@ -159,14 +162,16 @@ internal static class RandomizerRuntime {
         int mode = CreatureRandomization.Difficulty(GetMode(wizard.AccountId));
         int level = wizard.MagicSchoolBehavior.Level;
         string school = wizard.MagicSchoolBehavior.MagicSchool.ToString();
-        Dictionary<uint, Equipment> items = Data.Value.Equipment.ToDictionary(item => item.Id);
+        results.Items.RemoveAll(reward => uint.TryParse(reward.ItemId, out uint id) && QaGear.IsQa(id));
+        Equipment[] playerEquipment = Data.Value.Equipment.Where(item => !QaGear.IsQa(item.Id)).ToArray();
+        Dictionary<uint, Equipment> items = playerEquipment.ToDictionary(item => item.Id);
         int window = mode == 3 ? 30 : mode == 2 ? 20 : 10;
         foreach (var reward in results.Items) {
             if (!uint.TryParse(reward.ItemId, out uint id) || !items.TryGetValue(id, out Equipment original)) {
                 continue;
             }
 
-            Equipment[] candidates = Data.Value.Equipment.Where(item =>
+            Equipment[] candidates = playerEquipment.Where(item =>
                 item.Level <= level && item.Level >= Math.Max(0, level - window) &&
                 (item.School is "All" or "" || item.School == school)).OrderBy(item => item.Id).ToArray();
             if (candidates.Length == 0) {
@@ -203,6 +208,7 @@ internal static class RandomizerRuntime {
         public List<SpellVariant> SpellVariants { get; set; } = [];
         public List<DropSpell> DropSpells { get; set; } = [];
         public List<EquipmentCard> EquipmentCards { get; set; } = [];
+        public Dictionary<uint, string> TrainerSpellSchools { get; set; } = [];
     }
 
     private sealed class CreatureSwap {
