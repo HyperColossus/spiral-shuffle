@@ -90,6 +90,9 @@ internal static class Program {
         checks += EquipmentItemCardTests.Run(runtime.Assembly, root);
         checks += InfiniteManaTests.Run(runtime.Assembly);
         checks += SpellNumberTests.Run(runtime.Assembly, root);
+        checks += CreatureTurnTests.Run(runtime.Assembly);
+        checks += TrainerTests.Run(runtime.Assembly, root);
+        checks += QaGearTests.Run(runtime.Assembly, root);
         Console.WriteLine($"Passed {checks} runtime checks: six mode choices, creature routing, individual stat bounds, spell variants, loot requirements, and enemy inspector values.");
         return 0;
     }

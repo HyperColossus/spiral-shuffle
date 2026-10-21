@@ -31,7 +31,7 @@ internal sealed class EquipmentCardBuilder(
             List<EquipmentCardFile> files = [];
             for (int difficulty = 1; difficulty <= 3; difficulty++) {
                 (uint spellId, string spellName) = allocate($"SpiralGearSpell{difficulty}_{item.Id}");
-                BindDocument spell = BindDocument.Read(sourceSpell.Encode());
+                BindDocument spell = SpellCardAssets.Independent(BindDocument.Read(sourceSpell.Encode()));
                 spell.Value.Set<SpellTemplate>("m_name", spell.Value.Get<SpellTemplate>("m_name").WithString(spellName));
                 double multiplier = SpellStatRandomizer.Multiplier(difficulty, roll($"item-card:{item.Id}:numbers"));
                 SpellStatRandomizer.Apply(spell, donor.Template, multiplier, true);

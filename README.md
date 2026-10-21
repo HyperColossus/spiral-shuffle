@@ -6,6 +6,8 @@ Travel and spawn points stay normal.
 
 Spell numbers roll for attacks, drains, heals, blades, traps, shields, and enchants. Power ranges are 75-125% in Shuffle, 50-150% in Chaos, and 50-200% in Nightmare.
 
+Your usual school trainer's spells stay free, even when they shuffle into another school. Trainer rolls include utility spells and avoid repeated starter offers.
+
 Optional vendor shuffle gives each wizard their own random item and treasure-card stock, saved across reloads.
 
 Random Item Cards puts one random spell on every hat, robe, pair of boots, wand, athame, amulet, ring, and deck. Any school, with fresh number rolls for each piece. Turn it off to restore the usual item cards.

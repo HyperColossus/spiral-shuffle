@@ -33,11 +33,28 @@ internal static class SpellRules {
                 ? "aoe" : "attack";
         }
 
-        return kinds.Any(kind => kind is "kHeal" or "kHealOverTime") ? "heal" : "protected";
+        if (kinds.Any(kind => kind is "kHeal" or "kHealOverTime")) {
+            return "heal";
+        }
+        if (kinds.Contains("kModifyOutgoingDamage")) {
+            return "blade";
+        }
+        if (kinds.Contains("kModifyIncomingDamage")) {
+            return effects.Any(effect => effect.m_effectType == kSpellEffects.kModifyIncomingDamage && effect.m_effectParam > 0)
+                ? "trap" : "shield";
+        }
+        if (kinds.Contains("kModifyAccuracy")) {
+            return "accuracy";
+        }
+        if (kinds.Contains("kModifyCardDamage")) {
+            return "damage-enchant";
+        }
+        return "protected";
     }
 
     internal static bool Compatible(SpellTemplate original, SpellTemplate candidate) =>
-        candidate.m_spellBase != original.m_spellBase && candidate.m_displayName != original.m_displayName &&
+        candidate.m_displayName != original.m_displayName &&
+        (Role(original) is not ("attack" or "aoe" or "heal") || candidate.m_spellBase != original.m_spellBase) &&
         Role(candidate) == Role(original) &&
         (original.m_spellRank.m_spellRank <= 1
             ? candidate.m_spellRank.m_spellRank == original.m_spellRank.m_spellRank
