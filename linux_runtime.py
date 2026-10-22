@@ -68,7 +68,7 @@ def repair_deps(installed: Path = CONFIG.parent / DEP_NAME,
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as file:
             json.dump(replacement, file, indent=2)
-            file.write("\\n")
+            file.write("\n")
             file.flush()
             os.fsync(file.fileno())
         os.chmod(tmp, 0o600)
