@@ -35,3 +35,9 @@ To update, run `Stop.cmd`, replace the source files, and rerun `Setup.cmd` with 
 This uses its own save. Game files and personal account data aren't included in the repo. Early main-quest kill credit was tested; a full story run hasn't been tested. Nightmare can be rough at level 1.
 
 AGPL-3.0. Built on [Imlight](https://github.com/Revive101/Imlight/tree/b07987168fcfa2d123a5d78df90ca0c76405e427) and [Imcodec](https://github.com/Jooty/Imcodec/tree/r806919.Wizard_1_610). Not affiliated with KingsIsle.
+
+## Linux server (experimental)
+
+This fork includes an **Ubuntu/Linux server-side build and process controller**. It reuses Spiral Shuffle's existing Imlight patches and asset generation, without launching a Windows game client on the server. It requires a matching Linux Imlight release, Aurorium game data, Python 3.12+, and .NET 10. Its full server/client workflow has **not** been validated yet.
+
+See [README-LINUX.md](README-LINUX.md) for prerequisites, commands, network cautions and tests. The original Windows `Setup.cmd` / `Play.cmd` workflow remains intact.
