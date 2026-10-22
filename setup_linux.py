@@ -20,6 +20,7 @@ from pathlib import Path
 # Reuse the exact pinned upstream source build and game-asset generation
 # from the original Windows setup, without running its Windows-only setup.
 import setup as original
+from linux_runtime import repair_runtimeconfig
 
 ROOT = Path(__file__).resolve().parent
 RUNTIME = ROOT / ".runtime"
@@ -147,6 +148,9 @@ def build(revive: Path, dotnet: str, seed: str, game_ip: str) -> None:
     # Original build_server reads the installed Linux deps.json target and
     # builds the matching CoreLib/Director assemblies and NuGet dependencies.
     original.build_server(dotnet)
+    # Revive101's Linux runtimeconfig can describe self-contained deployment,
+    # whereas this build is framework-dependent and runs via 'dotnet'.
+    repair_runtimeconfig(SERVER / "Imlight.Director.runtimeconfig.json")
     run(dotnet, "run", "--project", "asset-tool", "-c", "Release", "--", str(revive),
         str(RUNTIME / "generated"), seed)
     for filename in ("extract_ui.py", "build_menu.py", "build_enemy_ui.py", "build_reward_ui.py",
