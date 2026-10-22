@@ -32,6 +32,7 @@ REQUIRED_REVIVE_FILES = (
     "Imlight/Imlight.Director.runtimeconfig.json",
     "Imlight/Imlight.CoreLib.dll",
     "Imlight/Imcodec.ObjectProperty.dll",
+    "Imlight/libzstd.linux.x64.so",
     f"Aurorium/data/{REVISION}/Data/GameData/Root.wad",
     f"Aurorium/data/{REVISION}/LatestFileList.bin",
     f"Aurorium/data/{REVISION}/LatestFileList.xml",
@@ -66,7 +67,10 @@ def stage_server(revive: Path) -> None:
         raise ValueError(f"Expected Linux Imlight release, got runtime target: {runtime_target!r}")
     SERVER.mkdir(parents=True, exist_ok=True)
     for file in source.iterdir():
-        if file.is_file() and file.suffix.lower() in {".dll", ".json"}:
+        # RavenDB/Sparrow loads native libraries (not just managed DLLs).
+        # Copy versioned .so files too, but no Windows .exe launchers.
+        native_so = file.suffix.lower() == ".so" or bool(re.search(r"\\.so(?:\\.\\d+)+$", file.name))
+        if file.is_file() and (file.suffix.lower() in {".dll", ".json"} or native_so):
             shutil.copy2(file, SERVER / file.name)
     database = source / "RavenDBServer"
     if not database.is_dir():
