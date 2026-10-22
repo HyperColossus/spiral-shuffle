@@ -69,11 +69,15 @@ class LinuxSetupTests(unittest.TestCase):
             (source/"Imlight.Director.deps.json").write_text(json.dumps({"runtimeTarget":{"name":".NETCoreApp,Version=v10.0/linux-x64"}}))
             (source/"Imlight.Director.dll").write_bytes(b"demo-linux-assembly")
             (source/"Imlight.Director.exe").write_bytes(b"windows-apphost")
+            (source/"libzstd.linux.x64.so").write_bytes(b"linux-native-zstd")
+            (source/"libexample.so.1").write_bytes(b"versioned-linux-native")
             (source/"RavenDBServer").mkdir()
             (source/"RavenDBServer/server").write_text("private")
             installer.stage_server(Path(folder)/"revive")
             self.assertTrue((installer.SERVER/"Imlight.Director.dll").is_file())
             self.assertFalse((installer.SERVER/"Imlight.Director.exe").exists())
+            self.assertEqual((installer.SERVER/"libzstd.linux.x64.so").read_bytes(), b"linux-native-zstd")
+            self.assertEqual((installer.SERVER/"libexample.so.1").read_bytes(), b"versioned-linux-native")
             self.assertTrue((installer.SERVER/"RavenDBServer/server").exists())
 
     def test_rejects_windows_runtime(self):
