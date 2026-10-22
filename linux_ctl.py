@@ -17,6 +17,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from linux_runtime import has_framework
+
 ROOT = Path(__file__).resolve().parent
 RUNTIME = ROOT / ".runtime"
 LOGS = RUNTIME / "logs"
@@ -79,6 +81,10 @@ def spawn(which: str, argv: list[str], cwd: Path) -> int:
 def start() -> int:
     if not (SERVER / "Imlight.Director.dll").is_file():
         print("Run setup_linux.py first; Imlight.Director.dll not built", file=sys.stderr)
+        return 2
+    if not has_framework(SERVER / "Imlight.Director.runtimeconfig.json"):
+        print("Imlight .NET runtime configuration is not framework-dependent; "
+              "run: python3 linux_runtime.py repair", file=sys.stderr)
         return 2
     if owned_process("server") or owned_process("patch"):
         print("Spiral Shuffle is already running or partly running; use status/stop first", file=sys.stderr)
