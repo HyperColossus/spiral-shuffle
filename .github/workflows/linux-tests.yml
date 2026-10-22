@@ -1,0 +1,37 @@
+name: Linux server port checks
+
+on:
+  push:
+    paths:
+      - 'setup_linux.py'
+      - 'linux_ctl.py'
+      - '*-Linux.sh'
+      - 'README-LINUX.md'
+      - 'tests/test_linux_port.py'
+      - '.github/workflows/linux-tests.yml'
+  pull_request:
+    paths:
+      - 'setup_linux.py'
+      - 'linux_ctl.py'
+      - '*-Linux.sh'
+      - 'tests/test_linux_port.py'
+      - '.github/workflows/linux-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  linux-wrapper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python and verify shell scripts
+        run: |
+          python3 -m py_compile setup_linux.py linux_ctl.py
+          bash -n Setup-Linux.sh Play-Linux.sh Stop-Linux.sh
+      - name: Run Linux-only safety tests
+        run: python3 -m unittest discover -s tests -p 'test_linux_port.py' -v
+
+# NOTE: An actual Imlight build is intentionally NOT run in CI because it
+# requires user-provided game data and the matching Linux release.
