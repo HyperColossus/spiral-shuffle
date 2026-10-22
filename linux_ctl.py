@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from linux_runtime import has_framework
+from linux_runtime import has_framework, bundled_runtime_dependencies
 
 ROOT = Path(__file__).resolve().parent
 RUNTIME = ROOT / ".runtime"
@@ -85,6 +85,18 @@ def start() -> int:
     if not has_framework(SERVER / "Imlight.Director.runtimeconfig.json"):
         print("Imlight .NET runtime configuration is not framework-dependent; "
               "run: python3 linux_runtime.py repair", file=sys.stderr)
+        return 2
+    deps = SERVER / "Imlight.Director.deps.json"
+    if not deps.is_file():
+        print("Missing Imlight dependency manifest; cannot start", file=sys.stderr)
+        return 2
+    try:
+        if bundled_runtime_dependencies(deps):
+            print("Imlight dependency manifest still references a bundled CoreCLR; "
+                  "run: python3 linux_runtime.py repair-deps", file=sys.stderr)
+            return 2
+    except (OSError, ValueError) as exc:
+        print(f"Invalid Imlight dependency manifest: {exc}", file=sys.stderr)
         return 2
     if owned_process("server") or owned_process("patch"):
         print("Spiral Shuffle is already running or partly running; use status/stop first", file=sys.stderr)
