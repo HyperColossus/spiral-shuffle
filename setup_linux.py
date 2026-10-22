@@ -69,7 +69,7 @@ def stage_server(revive: Path) -> None:
     for file in source.iterdir():
         # RavenDB/Sparrow loads native libraries (not just managed DLLs).
         # Copy versioned .so files too, but no Windows .exe launchers.
-        native_so = file.suffix.lower() == ".so" or bool(re.search(r"\\.so(?:\\.\\d+)+$", file.name))
+        native_so = file.suffix.lower() == ".so" or bool(re.search(r"\.so(?:\.\d+)+$", file.name))
         if file.is_file() and (file.suffix.lower() in {".dll", ".json"} or native_so):
             shutil.copy2(file, SERVER / file.name)
     database = source / "RavenDBServer"
