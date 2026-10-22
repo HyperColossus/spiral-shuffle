@@ -145,5 +145,65 @@ class LinuxControllerTests(unittest.TestCase):
             self.assertEqual(ctl.status(), 0)
 
 
+class LinuxRuntimeConfigTests(unittest.TestCase):
+    def test_repair_converts_self_contained_to_framework_dependent(self):
+        from linux_runtime import has_framework, repair_runtimeconfig
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"Imlight.Director.runtimeconfig.json"
+            (Path(folder)/"Imlight.Director.dll").write_bytes(b"test")
+            original = {"runtimeOptions": {
+                "tfm": "net10.0",
+                "includedFrameworks": [{"name": "Microsoft.NETCore.App", "version": "10.0.10"}],
+                "configProperties": {"System.GC.Server": True}
+            }}
+            path.write_text(json.dumps(original))
+            self.assertFalse(has_framework(path))
+            self.assertTrue(repair_runtimeconfig(path))
+            fixed = json.loads(path.read_text())
+            self.assertEqual(fixed["runtimeOptions"]["framework"],
+                             {"name": "Microsoft.NETCore.App", "version": "10.0.0"})
+            self.assertNotIn("includedFrameworks", fixed["runtimeOptions"])
+            self.assertEqual(fixed["runtimeOptions"]["configProperties"],
+                             {"System.GC.Server": True})
+            self.assertTrue(has_framework(path))
+            backup = Path(folder)/"Imlight.Director.runtimeconfig.before-linux-fix.json"
+            self.assertEqual(json.loads(backup.read_text()), original)
+            self.assertFalse(repair_runtimeconfig(path))
+            self.assertEqual(json.loads(backup.read_text()), original)
+
+    def test_repair_missing_runtimeconfig_without_rebuilding_game_assets(self):
+        from linux_runtime import has_framework, repair_runtimeconfig
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"Imlight.Director.runtimeconfig.json"
+            (Path(folder)/"Imlight.Director.dll").write_bytes(b"test")
+            self.assertTrue(repair_runtimeconfig(path))
+            self.assertTrue(has_framework(path))
+            self.assertFalse((Path(folder)/"Imlight.Director.runtimeconfig.before-linux-fix.json").exists())
+
+    def test_refuses_to_overwrite_existing_framework_or_missing_dll(self):
+        from linux_runtime import repair_runtimeconfig
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"Imlight.Director.runtimeconfig.json"
+            with self.assertRaises(FileNotFoundError):
+                repair_runtimeconfig(path)
+            (Path(folder)/"Imlight.Director.dll").write_bytes(b"test")
+            saved = {"runtimeOptions": {"framework": {"name": "Unknown.App", "version": "1.0.0"}}}
+            path.write_text(json.dumps(saved))
+            with self.assertRaisesRegex(ValueError, "manual review"):
+                repair_runtimeconfig(path)
+            self.assertEqual(json.loads(path.read_text()), saved)
+
+    def test_launcher_refuses_unrepaired_runtime_without_processes(self):
+        with tempfile.TemporaryDirectory() as folder, mock.patch.object(ctl, "SERVER", Path(folder)), \
+                mock.patch.object(ctl, "owned_process") as owned, \
+                mock.patch.object(ctl, "spawn") as spawn:
+            (Path(folder)/"Imlight.Director.dll").write_bytes(b"test")
+            (Path(folder)/"Imlight.Director.runtimeconfig.json").write_text(
+                json.dumps({"runtimeOptions": {"includedFrameworks": []}}))
+            self.assertEqual(ctl.start(), 2)
+            owned.assert_not_called()
+            spawn.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
