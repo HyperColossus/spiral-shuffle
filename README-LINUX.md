@@ -85,6 +85,43 @@ To package your **own** generated patch for a separate, legally obtained and com
 
 These files intentionally do **not** use Wine or execute `WizardGraphicalClient.exe`. A local Ubuntu game client under Wine might be possible but is a different, untested project. For the first server milestone, use a separate compatible Windows client.
 
+## Repairing CoreCLR startup errors on Linux
+
+The original Linux Imlight release can include both a self-contained
+`runtimeconfig.json` and a bundled-runtime `deps.json`. Spiral Shuffle
+rebuilds `Imlight.Director.dll` as a framework-dependent .NET 10 app.
+**Both manifests must match the rebuilt DLL.**
+
+After updating this fork, repair an existing `.runtime/` without rerunning
+asset generation:
+
+```bash
+cd ~/spiral-shuffle
+git pull --ff-only
+python3 linux_runtime.py repair
+python3 linux_runtime.py repair-deps
+python3 linux_runtime.py check
+```
+
+The dependency repair requires the local build file
+`director-build/bin/Release/net10.0/Imlight.Director.deps.json` and refuses
+to substitute another self-contained manifest. It backs up the installed
+dependency file to `Imlight.Director.deps.before-linux-fix.json`.
+It does not touch the original Revive101 installation, game assets, saves,
+or other processes. Future Linux setup builds apply both manifest repairs.
+
+If the server still exits, use **new log lines**, because
+`.runtime/logs/server.log` is append-only:
+
+```bash
+lines=$(wc -l < .runtime/logs/server.log)
+./Play-Linux.sh
+tail -n +$((lines + 1)) .runtime/logs/server.log
+```
+
+The last printed error is the relevant one; earlier libhostpolicy.so errors
+may remain from previous runs.
+
 ## Repairing missing libhostpolicy.so on Linux
 
 If startup reports `libhostpolicy.so` missing or that `Imlight.Director.runtimeconfig.json` does not specify a framework, this is a deployment-mode mismatch: the rebuilt .NET 10 server is framework-dependent but the installed runtime configuration was inherited from a self-contained release.
