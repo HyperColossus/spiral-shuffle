@@ -21,7 +21,7 @@ The upstream project is licensed **AGPL-3.0**. Preserve upstream authorship, his
 
 1. **Fork the upstream repo** using GitHub's Fork control: <https://github.com/ljste/spiral-shuffle/fork>. This overlay does **not** perform the fork automatically.
 2. Clone your fork to your Ubuntu laptop: `git clone https://github.com/HyperColossus/spiral-shuffle.git` (change path if the fork name differs).
-3. Copy these files to the root of your fork, keeping their names, and commit them to a new branch.
+3. The Linux scripts are already committed to your fork. On Ubuntu, clone the fork and mark the three launcher scripts executable with `chmod +x Setup-Linux.sh Play-Linux.sh Stop-Linux.sh`.
 4. Install Python **3.12+** and the **.NET 10 SDK** on Ubuntu. Run as a regular unprivileged user, not root.
 5. Obtain a legitimate, compatible Linux Revive101/Imlight installation and an Aurorium cache for the **same** game revision. Expected layout:
 
@@ -47,6 +47,8 @@ The upstream project is licensed **AGPL-3.0**. Preserve upstream authorship, his
 ## Check, build, start
 
 ```bash
+chmod +x Setup-Linux.sh Play-Linux.sh Stop-Linux.sh
+
 # Inspect prerequisites without touching the machine:
 ./Setup-Linux.sh --revive-path /path/to/Revive101 --check-only
 
