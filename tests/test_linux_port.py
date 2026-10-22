@@ -205,5 +205,61 @@ class LinuxRuntimeConfigTests(unittest.TestCase):
             spawn.assert_not_called()
 
 
+class LinuxDependencyTests(unittest.TestCase):
+    @staticmethod
+    def deps(self_contained=False):
+        result = {
+            "runtimeTarget": {"name": ".NETCoreApp,Version=v10.0/linux-x64"},
+            "libraries": {"Imlight.Director/1.0.0": {"type": "project"}},
+            "targets": {".NETCoreApp,Version=v10.0/linux-x64": {"Imlight.Director/1.0.0": {}}}
+        }
+        if self_contained:
+            result["libraries"]["runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.10"] = {"type": "package"}
+        return result
+
+    def test_compiled_deps_replaces_self_contained_release_safely(self):
+        from linux_runtime import bundled_runtime_dependencies, repair_deps
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            installed = root/"live/Imlight.Director.deps.json"
+            built = root/"out/Imlight.Director.deps.json"
+            installed.parent.mkdir()
+            built.parent.mkdir()
+            (installed.parent/"Imlight.Director.dll").write_bytes(b"test")
+            installed.write_text(json.dumps(self.deps(True)))
+            built.write_text(json.dumps(self.deps()))
+            self.assertTrue(bundled_runtime_dependencies(installed))
+            self.assertTrue(repair_deps(installed, built))
+            self.assertFalse(bundled_runtime_dependencies(installed))
+            backup = installed.with_name("Imlight.Director.deps.before-linux-fix.json")
+            self.assertTrue(bundled_runtime_dependencies(backup))
+            self.assertFalse(repair_deps(installed, built))
+            self.assertTrue(bundled_runtime_dependencies(backup))
+
+    def test_refuses_compiled_manifest_with_bundled_coreclr(self):
+        from linux_runtime import repair_deps
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            installed = root/"Imlight.Director.deps.json"
+            built = root/"Imlight.Director.built.deps.json"
+            (root/"Imlight.Director.dll").write_bytes(b"test")
+            installed.write_text(json.dumps(self.deps(True)))
+            built.write_text(json.dumps(self.deps(True)))
+            with self.assertRaisesRegex(ValueError, "bundled CoreCLR"):
+                repair_deps(installed, built)
+            self.assertTrue(json.loads(installed.read_text())["libraries"].get(
+                "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.10"))
+
+    def test_missing_local_compiled_deps_does_not_modify_installed_file(self):
+        from linux_runtime import repair_deps
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            installed = root/"Imlight.Director.deps.json"
+            installed.write_text(json.dumps(self.deps(True)))
+            with self.assertRaises(FileNotFoundError):
+                repair_deps(installed, root/"missing.deps.json")
+            self.assertTrue(installed.is_file())
+
+
 if __name__ == "__main__":
     unittest.main()
