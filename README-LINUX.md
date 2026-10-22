@@ -85,6 +85,20 @@ To package your **own** generated patch for a separate, legally obtained and com
 
 These files intentionally do **not** use Wine or execute `WizardGraphicalClient.exe`. A local Ubuntu game client under Wine might be possible but is a different, untested project. For the first server milestone, use a separate compatible Windows client.
 
+## Repairing missing libhostpolicy.so on Linux
+
+If startup reports `libhostpolicy.so` missing or that `Imlight.Director.runtimeconfig.json` does not specify a framework, this is a deployment-mode mismatch: the rebuilt .NET 10 server is framework-dependent but the installed runtime configuration was inherited from a self-contained release.
+
+Do **not** delete your game assets or reinstall .NET. In the fork folder run:
+
+```bash
+cd ~/spiral-shuffle
+python3 linux_runtime.py repair
+python3 linux_runtime.py check
+```
+
+The repair edits only `.runtime/server/Imlight.Director.runtimeconfig.json` and creates a one-time backup. Fresh Linux builds apply the same repair automatically. If startup previously left PID files, first confirm no Spiral Shuffle processes are running before removing only its stale `.runtime/run/server.pid` and `.runtime/run/patch.pid` files. Then use `./Play-Linux.sh` and inspect `.runtime/logs/server.log`. The script does not stop your other services.
+
 ## Safety and troubleshooting
 
 - `.runtime/` must remain ignored by Git (already in upstream `.gitignore`, verify your fork).
