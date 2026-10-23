@@ -1,0 +1,20 @@
+# Separate, optional RavenDB service for Spiral Shuffle.
+# DO NOT add this to any existing bot/web Docker Compose project.
+# Explicitly bound to 127.0.0.1:18080: database is never internet-facing.
+name: spiral-shuffle-ravendb
+services:
+  database:
+    image: ravendb/ravendb:7.2.6-ubuntu.24.04-x64
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:8080"
+    environment:
+      RAVEN_Setup_Mode: "None"
+      RAVEN_Security_UnsecuredAccessAllowed: "PrivateNetwork"
+      RAVEN_ServerUrl: "http://0.0.0.0:8080"
+      RAVEN_PublicServerUrl: "http://127.0.0.1:18080"
+    volumes:
+      - spiral_data:/var/lib/ravendb/data
+
+volumes:
+  spiral_data:
