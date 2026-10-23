@@ -32,13 +32,12 @@ class DockerDBTests(TestCase):
             db.get_setting("PlayerDatabaseUrl = x\nPlayerDatabaseUrl = y", "PlayerDatabaseUrl")
 
     def test_refuses_docker_switch_when_game_running(self):
-        with mock.patch.dict("sys.modules", {}):
-            import sys
-            sys.path.insert(0, str(ROOT))
-            import linux_ctl
-            with mock.patch.object(linux_ctl, "owned_process", return_value=123):
-                with self.assertRaisesRegex(RuntimeError, "Stop Spiral Shuffle"):
-                    db.switch()
+        import sys
+        sys.path.insert(0, str(ROOT))
+        import linux_ctl
+        with mock.patch.object(linux_ctl, "owned_process", return_value=123):
+            with self.assertRaisesRegex(RuntimeError, "Stop Spiral Shuffle"):
+                db.switch()
 
     def test_switch_preserves_source_file_and_makes_private_backup(self):
         with TemporaryDirectory() as folder:
