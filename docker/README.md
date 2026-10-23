@@ -65,11 +65,11 @@ Official RavenDB export documentation: https://docs.ravendb.net/7.2/studio/datab
 
 ## 3. Import into Docker RavenDB
 
-In the **new Docker RavenDB Studio**, create a database named exactly **Playerdata** (capitalization matters). Use **Tasks → Import Data → From RavenDB** or the Studio import method for a `.ravendbdump` file, selecting the export from step 2.
+In the **new Docker RavenDB Studio**, create a database named exactly **Playerdata** (capitalization matters). Use **Tasks → Import Data → From file (.ravendbdump)** to import the saved export from step 2.
 
 After import, compare document counts and verify the **Accounts** and **Wizards** collections have the expected records. Do not rely on document count alone. Keep the original export file and embedded save directory for rollback.
 
-Official docs: https://docs.ravendb.net/7.2/backup/restore and https://docs.ravendb.net/7.2/studio/database/tasks/export-database
+Official docs: https://docs.ravendb.net/7.2/studio/database/tasks/import-data/import-data-file
 
 Verify Ubuntu can read the new database:
 
