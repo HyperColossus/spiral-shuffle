@@ -3,297 +3,232 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080c1b">
-  <meta name="description" content="Spiral Shuffle — an independent Wizard101-inspired randomizer multiplayer server. Enter a familiar world where the rules have changed.">
-  <meta property="og:title" content="Spiral Shuffle | Rewrite Your Destiny">
-  <meta property="og:description" content="Discover randomized magic, unpredictable encounters and a world waiting to be rediscovered.">
-  <meta property="og:type" content="website">
-  <title>Spiral Shuffle — Rewrite Your Destiny</title>
+  <meta name="theme-color" content="#080b1b">
+  <meta name="description" content="Spiral Shuffle — friends-only multiplayer randomizer server.">
+  <title>Spiral Shuffle</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root{color-scheme:dark;--void:#080c1b;--deep:#0c1224;--panel:#121a30;--soft:#1a2541;--line:rgba(210,196,161,.16);--gold:#f1cb87;--gold2:#c99c51;--cream:#f8f0dc;--white:#f7f5f0;--muted:#aab2c8;--lavender:#a7a0e6;--mint:#99e0d2;--sans:"DM Sans",system-ui,-apple-system,Segoe UI,sans-serif;--serif:"Cinzel",Georgia,serif}
-    *{box-sizing:border-box}
-    html{scroll-behavior:smooth;scroll-padding-top:90px}
-    body{margin:0;overflow-x:hidden;background:var(--void);color:var(--white);font-family:var(--sans);-webkit-font-smoothing:antialiased}
-    body::before{content:"";position:absolute;inset:0 0 auto;height:1050px;z-index:-2;pointer-events:none;background:radial-gradient(ellipse 64% 52% at 72% 30%,rgba(77,77,141,.23),transparent 78%),radial-gradient(ellipse 64% 55% at 9% 35%,rgba(21,88,102,.14),transparent 74%),linear-gradient(#0b1022,#080c1b)}
-    body::after{content:"";pointer-events:none;position:absolute;top:0;right:0;left:0;height:900px;z-index:-1;opacity:.57;background-image:radial-gradient(1px 1px at 7% 18%,#fff 99%,transparent),radial-gradient(1px 1px at 22% 54%,#fff 99%,transparent),radial-gradient(2px 2px at 59% 24%,#c6bdff 99%,transparent),radial-gradient(1px 1px at 91% 9%,#fff 99%,transparent),radial-gradient(1px 1px at 77% 67%,#fff 99%,transparent),radial-gradient(2px 2px at 40% 72%,#e6ca9c 99%,transparent),radial-gradient(1px 1px at 95% 82%,#fff 99%,transparent),radial-gradient(1px 1px at 65% 93%,#fff 99%,transparent);background-size:350px 280px,410px 370px,620px 480px,500px 390px,330px 360px,560px 460px,430px 300px,680px 560px}
-    a{color:inherit;text-decoration:none}button,input{font:inherit}button{cursor:pointer}
-    button:disabled{cursor:not-allowed}
-    ::selection{background:#ba9760;color:#091022}
-    .shell{width:min(1190px,calc(100% - 56px));margin-inline:auto}
-    .topline{height:3px;background:linear-gradient(90deg,transparent,#aa8551 20%,#f5dca9 51%,#a88550 80%,transparent)}
-    .site-header{position:relative;z-index:20;border-bottom:1px solid rgba(255,255,255,.075);background:rgba(8,12,27,.68);backdrop-filter:blur(22px)}
-    .header-inner{display:flex;align-items:center;justify-content:space-between;min-height:88px;gap:22px}
-    .brand{display:inline-flex;align-items:center;gap:12px;flex-shrink:0}
-    .brand-mark{width:43px;height:43px;display:grid;place-items:center;color:var(--gold);border:1px solid rgba(237,198,127,.45);transform:rotate(45deg);box-shadow:0 0 26px rgba(227,173,90,.08),inset 0 0 15px rgba(221,178,100,.06)}
-    .brand-mark svg{transform:rotate(-45deg)}
-    .brand-name{font-family:var(--serif);font-size:19px;line-height:1.1;letter-spacing:.065em;font-weight:700}
-    .brand-name span{display:block;color:var(--gold);font-size:10px;letter-spacing:.29em;margin-top:6px;font-family:var(--sans);font-weight:700}
-    .nav-links{display:flex;align-items:center;gap:34px}
-    .nav-links a{font-size:13px;color:#c5c8d8;font-weight:600;transition:color .2s}
-    .nav-links a:hover,.nav-links a:focus-visible{color:var(--gold)}
-    .header-actions{display:flex;align-items:center;gap:14px}
-    .nav-button{font-size:12px;letter-spacing:.13em;font-weight:700;text-transform:uppercase;padding:13px 19px;border:1px solid var(--gold2);color:var(--gold);transition:.2s;background:rgba(235,198,126,.045)}
-    .nav-button:hover{background:rgba(241,203,135,.14);transform:translateY(-1px)}
-    .hamburger{display:none;background:none;border:1px solid var(--line);width:44px;height:44px;align-items:center;justify-content:center;color:var(--cream)}
-    .eyebrow{display:inline-flex;align-items:center;gap:12px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);font-size:11px;font-weight:700}
-    .eyebrow::before{content:"";height:1px;width:29px;background:var(--gold2)}
-    .hero{min-height:680px;display:grid;grid-template-columns:1fr 1.02fr;align-items:center;position:relative;padding-block:65px 100px}
-    .hero-copy{position:relative;z-index:2;padding-bottom:10px}
-    .status{display:inline-flex;gap:9px;align-items:center;padding:7px 11px;border:1px solid rgba(149,219,200,.24);background:rgba(88,180,159,.06);color:var(--mint);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;margin-bottom:31px}
-    .status-dot{width:6px;height:6px;border-radius:50%;background:#8ad6be;box-shadow:0 0 12px #8ad6be}
-    h1,h2,h3,p{margin-top:0}
-    h1,h2,h3{font-family:var(--serif)}
-    h1{max-width:720px;font-size:clamp(46px,5.4vw,78px);font-weight:600;letter-spacing:-.052em;line-height:1.1;margin-bottom:24px}
-    h1 span{display:block;color:var(--gold);text-shadow:0 0 50px rgba(224,167,80,.17)}
-    .hero-desc{max-width:455px;color:#b9bed2;font-size:16px;line-height:1.95;margin-bottom:33px}
-    .hero-buttons{display:flex;gap:13px;flex-wrap:wrap;align-items:center}
-    .button{display:inline-flex;justify-content:center;align-items:center;gap:12px;min-height:51px;padding:13px 24px;font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;border:1px solid transparent;transition:transform .22s,background .22s,box-shadow .22s}
-    .button:hover:not(:disabled){transform:translateY(-2px)}
-    .button-gold{color:#17131b;background:linear-gradient(125deg,#f6dba4,#ddb269);box-shadow:0 6px 28px rgba(235,174,80,.12)}
-    .button-gold:hover:not(:disabled){box-shadow:0 8px 38px rgba(235,174,80,.27)}
-    .button-ghost{border-color:rgba(234,223,205,.24);color:var(--cream);background:rgba(255,255,255,.025)}
-    .button-ghost:hover{background:rgba(255,255,255,.085)}
-    .arrow{font-size:19px;font-weight:400;line-height:1}
-    .hero-foot{display:flex;gap:27px;margin-top:48px;padding-top:23px;border-top:1px solid var(--line);max-width:435px}
-    .hero-foot div{display:flex;flex-direction:column;gap:6px}
-    .hero-foot strong{color:#f6eedb;font-size:13px;font-weight:700}
-    .hero-foot small{color:#909bb7;text-transform:uppercase;letter-spacing:.11em;font-size:9px;font-weight:700}
-    .hero-visual{min-width:0;position:relative;display:grid;place-items:center;align-self:stretch}
-    .universe{width:min(100%,580px);aspect-ratio:1;position:relative;display:grid;place-items:center}
-    .universe::before{content:"";position:absolute;inset:4%;background:radial-gradient(circle,rgba(160,132,222,.19),rgba(26,35,74,.19) 37%,transparent 64%);filter:blur(20px)}
-    .universe::after{content:"";position:absolute;width:76%;height:76%;border:1px solid rgba(219,182,124,.13);border-radius:50%;box-shadow:0 0 0 42px rgba(227,191,136,.015)}
-    .orbit-art{width:100%;max-width:580px;overflow:visible;filter:drop-shadow(0 0 32px rgba(178,145,211,.23))}
-    .ring-outer{transform-origin:50% 50%;animation:spin 90s linear infinite}
-    .ring-inner{transform-origin:50% 50%;animation:spin 70s linear infinite reverse}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .float-chip{position:absolute;padding:13px 16px;border:1px solid rgba(224,206,168,.2);background:rgba(14,22,43,.89);box-shadow:0 10px 46px rgba(0,0,0,.27);backdrop-filter:blur(8px)}
-    .float-chip small{display:block;text-transform:uppercase;color:#9fa9c4;font-size:9px;letter-spacing:.19em;font-weight:700;margin-bottom:4px}
-    .float-chip strong{font-family:var(--serif);font-size:13px;color:var(--gold);font-weight:600}
-    .chip-a{left:1%;top:24%;transform:rotate(-3deg)}
-    .chip-b{right:0;bottom:18%;transform:rotate(2deg)}
-    .scroll-prompt{position:absolute;bottom:43px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.22em;color:#727c99;display:flex;gap:12px;align-items:center;text-transform:uppercase}
-    .scroll-prompt::before,.scroll-prompt::after{content:"";width:24px;height:1px;background:#626987}
-    .section{padding-block:100px}
-    .section-heading{text-align:center;max-width:740px;margin:0 auto 50px}
-    .section-heading .eyebrow::after{content:"";height:1px;width:29px;background:var(--gold2)}
-    .section-heading h2{margin:23px 0 16px;font-size:clamp(30px,3.3vw,47px);line-height:1.23;letter-spacing:-.035em;font-weight:600}
-    .section-heading p{font-size:15px;line-height:1.85;color:var(--muted)}
-    .feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
-    .feature{position:relative;min-height:304px;padding:32px 29px;border:1px solid var(--line);background:linear-gradient(142deg,rgba(27,37,65,.75),rgba(12,17,33,.85));overflow:hidden}
-    .feature::before{content:"";position:absolute;height:3px;width:58px;left:29px;top:0;background:linear-gradient(90deg,#e6be78,transparent)}
-    .feature-number{position:absolute;right:21px;top:16px;font-family:var(--serif);font-size:50px;color:rgba(241,203,135,.065)}
-    .feature-icon{display:grid;place-items:center;width:63px;height:63px;color:var(--gold);border:1px solid rgba(237,198,127,.27);background:rgba(237,198,127,.055);margin-bottom:32px}
-    .feature h3{font-size:19px;letter-spacing:-.015em;font-weight:600;margin-bottom:11px}
-    .feature p{font-size:13px;line-height:1.85;color:#a6b0c9;margin:0}
-    .rule{height:1px;background:linear-gradient(90deg,transparent,var(--line) 15%,rgba(235,201,146,.34) 50%,var(--line) 85%,transparent)}
-    .how-section{background:linear-gradient(180deg,rgba(20,30,53,.37),rgba(9,14,26,0))}
-    .steps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:42px;position:relative}
-    .step{position:relative;padding-top:13px}
-    .step-count{font-family:var(--serif);font-size:53px;color:rgba(241,203,135,.21);line-height:1;margin-bottom:16px}
-    .step h3{font-size:18px;margin-bottom:10px;font-weight:600}
-    .step p{color:#adb5ca;font-size:13px;line-height:1.9;margin:0;max-width:300px}
-    .step::after{content:"";height:1px;background:linear-gradient(90deg,rgba(241,203,135,.33),transparent);position:absolute;top:57px;left:79px;right:0}
-    .gateway-section{padding-block:84px 100px}
-    .gateway{position:relative;border:1px solid rgba(241,203,135,.24);background:linear-gradient(112deg,rgba(23,32,58,.96),rgba(9,14,29,.98));display:grid;grid-template-columns:.87fr 1.13fr;overflow:hidden}
-    .gateway::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 6% 45%,rgba(88,96,173,.18),transparent 52%);opacity:.9}
-    .gateway-copy{padding:56px 48px;position:relative;z-index:1;border-right:1px solid var(--line)}
-    .gateway-copy h2{font-size:clamp(28px,3.1vw,39px);font-weight:600;letter-spacing:-.025em;margin:20px 0}
-    .gateway-copy p{font-size:14px;line-height:1.9;color:#b3bdd2}
-    .connect-label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:37px 0 12px}
-    .address-box{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(0,0,0,.24);border:1px solid rgba(202,199,207,.18);padding:14px 13px 14px 17px}
-    .address-box code{font-size:13px;color:#eae6df;word-break:break-all}
-    .copy-button{display:inline-grid;place-items:center;width:36px;height:33px;border:1px solid rgba(224,197,157,.3);background:rgba(241,203,135,.07);color:var(--gold);flex-shrink:0}
-    .copy-button:hover:not(:disabled){background:rgba(241,203,135,.18)}
-    .copy-button:disabled{opacity:.42}
-    .gateway-note{font-size:11px!important;color:#8591ad!important;margin-top:14px}
-    .signup{padding:49px 49px 45px;position:relative;z-index:1}
-    .signup-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:19px}
-    .signup-header h3{font-size:21px;font-weight:600;margin:0}
-    .mode-badge{color:var(--gold);border:1px solid rgba(241,203,135,.22);background:rgba(241,203,135,.05);font-size:9px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:7px 9px}
-    .form-intro{font-size:12px;line-height:1.7;color:#9ca8c5;margin-bottom:23px}
-    .input-group{margin-bottom:17px}
-    .input-group label{display:block;margin-bottom:8px;color:#dce0ea;font-size:11px;letter-spacing:.04em;font-weight:700}
-    .input-group input{width:100%;border:1px solid rgba(195,205,225,.17);background:rgba(2,7,19,.45);outline:none;color:#f4f1ed;min-height:46px;padding:12px 14px;border-radius:0;transition:border .2s,box-shadow .2s}
-    .input-group input::placeholder{color:#697590}
-    .input-group input:focus{border-color:rgba(241,203,135,.62);box-shadow:0 0 0 3px rgba(241,203,135,.085)}
-    .input-group input:disabled{opacity:.56}
-    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .signup-action{width:100%;margin-top:2px}
-    .signup-action:disabled{background:#4b4852;color:#d0ccd0;box-shadow:none;opacity:.7}
-    .form-note{font-size:11px;line-height:1.7;color:#929eb7;margin:13px 0 0}
-    .form-message{display:none;margin:0 0 17px;padding:12px 13px;border:1px solid rgba(233,189,105,.31);background:rgba(233,189,105,.08);color:#f1d6a9;font-size:12px;line-height:1.6}
-    .form-message.show{display:block}
-    .form-message.ok{background:rgba(118,219,191,.08);border-color:rgba(118,219,191,.31);color:#a6e5d1}
-    .faq-section{padding-top:5px;padding-bottom:97px}
-    .faq-layout{display:grid;grid-template-columns:.85fr 1.15fr;gap:90px}
-    .faq-layout h2{font-size:34px;letter-spacing:-.03em;line-height:1.32;font-weight:600;margin:21px 0 15px}
-    .faq-layout .faq-sub{font-size:14px;line-height:1.9;color:var(--muted);max-width:350px}
-    details{border-bottom:1px solid var(--line);padding:19px 0}
-    details:first-child{border-top:1px solid var(--line)}
-    summary{list-style:none;font-weight:600;color:#e9e7e1;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:20px;cursor:pointer}
-    summary::-webkit-details-marker{display:none}
-    summary::after{content:"+";font-size:22px;color:var(--gold);font-weight:400}
-    details[open] summary::after{content:"−"}
-    details p{font-size:13px;line-height:1.9;color:#acb5cb;margin:14px 30px 0 0}
-    .footer{border-top:1px solid var(--line);padding:37px 0 32px;background:#070b15}
-    .footer-inner{display:flex;align-items:center;justify-content:space-between;gap:24px}
-    .footer-brand{font:600 14px var(--serif);letter-spacing:.1em;color:var(--gold)}
-    .footer p{color:#8190aa;font-size:11px;line-height:1.8;margin:7px 0 0;max-width:610px}
-    .footer-right{font-size:11px;color:#8590ab;text-align:right;line-height:1.8}
-    .footer-right a{text-decoration:underline;text-underline-offset:3px}
-    .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-    :focus-visible{outline:2px solid var(--gold);outline-offset:4px}
-    @media(max-width:1020px){.nav-links{gap:17px}.hero{grid-template-columns:1.05fr .95fr}.hero-visual{margin-right:-25px}.float-chip{padding:10px}.chip-a{left:-4%}.gateway-copy{padding:42px 35px}.signup{padding:40px 35px}.faq-layout{gap:45px}}
-    @media(max-width:760px){.shell{width:min(100% - 38px,600px)}.header-inner{min-height:72px}.brand-name{font-size:16px}.brand-mark{width:37px;height:37px}.header-actions .nav-button{display:none}.hamburger{display:flex}.nav-links{display:none;position:absolute;top:72px;left:0;right:0;background:#10172c;border-bottom:1px solid var(--line);padding:18px 24px;flex-direction:column;align-items:stretch;gap:0}.nav-links.open{display:flex}.nav-links a{padding:12px 2px;font-size:14px}.hero{grid-template-columns:1fr;min-height:unset;padding-block:60px 68px}.hero-copy{max-width:580px}h1{font-size:clamp(48px,10vw,66px)}.hero-visual{margin:15px auto -14px;width:min(100%,430px)}.universe{width:100%}.chip-a{left:-2%;top:24%}.chip-b{right:-2%;bottom:14%}.scroll-prompt{display:none}.section{padding-block:75px}.feature-grid{grid-template-columns:1fr;gap:13px}.feature{min-height:230px}.feature-icon{margin-bottom:24px}.steps-grid{grid-template-columns:1fr;gap:27px}.step{display:grid;grid-template-columns:65px 1fr;column-gap:15px}.step-count{grid-row:1/3;margin:0}.step h3{margin-top:5px}.step p{grid-column:2}.step::after{display:none}.gateway-section{padding-block:70px}.gateway{grid-template-columns:1fr}.gateway-copy{border-right:0;border-bottom:1px solid var(--line)}.faq-layout{grid-template-columns:1fr;gap:25px}.faq-section{padding-block:10px 75px}.footer-inner{align-items:flex-start;flex-direction:column}.footer-right{text-align:left}}
-    @media(max-width:440px){.shell{width:calc(100% - 32px)}.hero{padding-top:42px}.status{letter-spacing:.11em;font-size:9px}h1{font-size:46px}.hero-desc{font-size:14px}.hero-buttons{flex-direction:column;align-items:stretch}.hero-foot{gap:15px;flex-wrap:wrap;margin-top:35px}.chip-b{right:-4%}.chip-a{left:-4%}.float-chip strong{font-size:10px}.float-chip small{font-size:8px}.section-heading h2{font-size:31px}.gateway-copy,.signup{padding:35px 21px}.field-row{grid-template-columns:1fr;gap:0}.signup-header{align-items:flex-start;flex-direction:column}.faq-layout h2{font-size:31px}}
-    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.ring-inner,.ring-outer{animation:none}.button,.nav-button{transition:none}}
+    :root {
+      color-scheme: dark;
+      --white: #f7f5ff;
+      --soft: #b3b8ce;
+      --glow: #b9b4ff;
+      --accent: #c6b6ff;
+      --mint: #a6f7e3;
+      --border: rgba(235, 234, 255, .17);
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --body: "DM Sans", system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--white);
+      background: #0b1026;
+      font-family: var(--body);
+      -webkit-font-smoothing: antialiased;
+    }
+    .scene {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      isolation: isolate;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 85% 75% at 4% 7%, rgba(63, 50, 131, .92), transparent 75%),
+        radial-gradient(ellipse 90% 72% at 98% 74%, rgba(9, 103, 121, .65), transparent 80%),
+        radial-gradient(ellipse 60% 55% at 60% 40%, rgba(53, 32, 107, .65), transparent 83%),
+        linear-gradient(133deg, #12102f 0%, #101737 45%, #031c2d 100%);
+    }
+    .scene::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background: radial-gradient(ellipse at 50% 40%, rgba(3, 7, 24, .12) 8%, rgba(2, 5, 19, .43) 100%);
+    }
+    #liquid {
+      width: 100%;
+      height: 100%;
+      display: block;
+      mix-blend-mode: screen;
+      filter: blur(21px) saturate(165%);
+      opacity: .91;
+      transform: scale(1.075);
+    }
+    .grain {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: .12;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+    }
+    .center {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: 38px 20px;
+    }
+    .panel {
+      width: min(100%, 500px);
+      padding: clamp(28px, 5vw, 53px);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      background: linear-gradient(155deg, rgba(13, 16, 38, .63), rgba(6, 14, 30, .79));
+      box-shadow: 0 33px 100px rgba(2, 5, 17, .37), inset 0 1px 0 rgba(255, 255, 255, .1);
+      -webkit-backdrop-filter: blur(32px) saturate(125%);
+      backdrop-filter: blur(32px) saturate(125%);
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(36px, 7vw, 51px);
+      font-weight: 700;
+      letter-spacing: -.065em;
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+    .ip {
+      display: block;
+      margin: 26px 0 35px;
+      color: var(--mint);
+      font-family: var(--display);
+      font-size: clamp(26px, 5vw, 37px);
+      font-weight: 600;
+      letter-spacing: -.045em;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      text-shadow: 0 0 48px rgba(142, 250, 227, .25);
+      user-select: all;
+    }
+    .ip.pending {
+      color: #cecae8;
+      font-size: clamp(22px, 4.3vw, 31px);
+      letter-spacing: -.04em;
+    }
+    form { display: grid; gap: 14px; }
+    .input {
+      width: 100%;
+      min-height: 56px;
+      padding: 0 19px;
+      border: 1px solid rgba(240, 237, 255, .2);
+      border-radius: 15px;
+      color: var(--white);
+      background: rgba(11, 16, 36, .51);
+      font-family: var(--body);
+      font-size: 16px;
+      outline: none;
+      transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .input::placeholder { color: #b5bad0; opacity: .94; }
+    .input:focus {
+      background: rgba(16, 21, 45, .82);
+      border-color: rgba(182, 248, 226, .82);
+      box-shadow: 0 0 0 3px rgba(166, 247, 227, .11);
+    }
+    .input:disabled { opacity: .64; cursor: not-allowed; }
+    .button {
+      display: block;
+      width: 100%;
+      min-height: 56px;
+      margin-top: 2px;
+      padding: 13px 18px;
+      border: 0;
+      border-radius: 15px;
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -.015em;
+      color: #0e1428;
+      background: linear-gradient(115deg, #a8f3dd 0%, #b1dce9 44%, #c5b5ff 100%);
+      box-shadow: 0 9px 30px rgba(103, 171, 190, .19);
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+      cursor: pointer;
+    }
+    .button:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 13px 39px rgba(141, 184, 233, .28);
+    }
+    .button:not(:disabled):active { transform: translateY(0); }
+    .button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+    .verification { display: flex; justify-content: center; min-height: 0; }
+    .message {
+      margin: 0;
+      color: #ffd9e0;
+      font-size: 13px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .message:empty { display: none; }
+    .message.success { color: #b1ffdf; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+    :focus-visible { outline: 2px solid #c6b6ff; outline-offset: 3px; }
+    @media (max-width: 480px) {
+      .center { padding: 20px 14px; }
+      .panel { border-radius: 24px; padding: 38px 22px; }
+      h1 { font-size: clamp(35px, 11vw, 47px); }
+      .ip { margin: 25px 0 30px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0s !important; }
+    }
   </style>
 </head>
 <body>
-  <div class="topline" aria-hidden="true"></div>
-  <header class="site-header">
-    <div class="shell header-inner">
-      <a class="brand" href="#home" aria-label="Spiral Shuffle home">
-        <span class="brand-mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 30 30" fill="none"><path d="M15 2.5 27.5 15 15 27.5 2.5 15 15 2.5Z" stroke="currentColor" stroke-width="1.1"/><path d="M20 10.2c-1.5-3-6.6-3.2-9.1-.3-3.4 3.9-.6 10.8 4.7 10.8 4.1 0 6.7-4.7 3.7-7.3-2.2-1.9-5.6-.3-5.4 2.1.2 2.1 3.3 2.8 4 .7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
-        <span class="brand-name">SPIRAL SHUFFLE<span>THE UNWRITTEN PATH</span></span>
-      </a>
-      <nav id="primary-nav" class="nav-links" aria-label="Main navigation">
-        <a href="#experience">The experience</a><a href="#how-to-play">How to play</a><a href="#join">Join the spiral</a><a href="#faq">Questions</a>
-      </nav>
-      <div class="header-actions">
-        <a class="nav-button" href="#join">ENTER THE SPIRAL <span aria-hidden="true">↗</span></a>
-        <button class="hamburger" id="menu-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="primary-nav"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8"><path d="M3 7h18M3 12h18M3 17h18"/></svg></button>
-      </div>
-    </div>
-  </header>
-  <main>
-    <section class="hero shell" id="home">
-      <div class="hero-copy">
-        <div class="status"><span class="status-dot" aria-hidden="true"></span> Community server • Preparing for launch</div>
-        <h1>THE SPIRAL,<span>REWRITTEN.</span></h1>
-        <p class="hero-desc">You know the worlds. You know the spells. But what if nothing unfolded quite the way you remembered? Step into a familiar universe where every adventure can surprise you.</p>
-        <div class="hero-buttons">
-          <a class="button button-gold" href="#join">BEGIN YOUR JOURNEY <span class="arrow" aria-hidden="true">↗</span></a>
-          <a class="button button-ghost" href="#experience">EXPLORE THE RANDOMIZER <span class="arrow" aria-hidden="true">→</span></a>
-        </div>
-        <div class="hero-foot">
-          <div><strong>6 REALMS</strong><small>Choose your chaos</small></div>
-          <div><strong>ONE SPIRAL</strong><small>Shared adventures</small></div>
-          <div><strong>NEW POSSIBILITIES</strong><small>Every run</small></div>
-        </div>
-      </div>
-      <div class="hero-visual" aria-label="Decorative magical spiral illustration" role="img">
-        <div class="universe">
-          <svg class="orbit-art" viewBox="0 0 580 580" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <defs>
-              <radialGradient id="core"><stop stop-color="#8272b8" stop-opacity=".5"/><stop offset=".46" stop-color="#382d67" stop-opacity=".23"/><stop offset="1" stop-color="#121a32" stop-opacity="0"/></radialGradient>
-              <linearGradient id="aura" x1="99" y1="71" x2="448" y2="524" gradientUnits="userSpaceOnUse"><stop stop-color="#e0c58c"/><stop offset=".36" stop-color="#8e83cd"/><stop offset=".73" stop-color="#9acdbd"/><stop offset="1" stop-color="#dab47d"/></linearGradient>
-              <linearGradient id="bright" x1="180" y1="134" x2="408" y2="437" gradientUnits="userSpaceOnUse"><stop stop-color="#f7dd9e"/><stop offset=".46" stop-color="#d6a7df"/><stop offset="1" stop-color="#8fdad4"/></linearGradient>
-              <filter id="glow"><feGaussianBlur stdDeviation="7"/></filter>
-            </defs>
-            <circle cx="290" cy="290" r="248" fill="url(#core)"/>
-            <circle cx="290" cy="290" r="216" stroke="#dcc08f" stroke-opacity=".23"/>
-            <circle cx="290" cy="290" r="178" stroke="#a89aca" stroke-opacity=".3" stroke-dasharray="2 10"/>
-            <circle cx="290" cy="290" r="245" stroke="url(#aura)" stroke-opacity=".35" stroke-dasharray="90 17 3 28"/>
-            <g class="ring-outer">
-              <circle cx="290" cy="290" r="231" stroke="#cfb17b" stroke-opacity=".26" stroke-dasharray="1 12"/>
-              <path d="M290 30V58M290 522v28M30 290h28M522 290h28" stroke="#f3d39d" stroke-opacity=".68" stroke-width="1.3"/>
-              <path d="m106 106 20 20m348 348-20-20M474 106l-20 20M106 474l20-20" stroke="#9c98df" stroke-opacity=".75"/>
-              <path d="m290 46 6 6-6 6-6-6 6-6ZM534 290l-6 6-6-6 6-6 6-6ZM290 534l-6-6 6-6 6 6-6 6ZM46 290l6-6 6 6-6 6-6-6Z" fill="#edca88"/>
-            </g>
-            <g class="ring-inner">
-              <circle cx="290" cy="290" r="151" stroke="url(#aura)" stroke-opacity=".48"/>
-              <circle cx="290" cy="290" r="164" stroke="#dfcaac" stroke-opacity=".13" stroke-dasharray="3 21"/>
-              <path d="M290 107v21M290 452v21M107 290h21M452 290h21" stroke="#eed3a4" stroke-opacity=".72"/>
-              <path d="m182 182 11 11m194 194 11 11m0-216-11 11m-194 194-11 11" stroke="#94cec6" stroke-opacity=".75"/>
-              <circle cx="290" cy="139" r="3" fill="#f2daa5"/><circle cx="441" cy="290" r="3" fill="#b2abe8"/><circle cx="290" cy="441" r="3" fill="#8cd9cc"/><circle cx="139" cy="290" r="3" fill="#f2daa5"/>
-            </g>
-            <path d="M290 192 388 290 290 388 192 290 290 192Z" fill="#12192d" fill-opacity=".82" stroke="#edc68a" stroke-opacity=".6" stroke-width="1.2"/>
-            <path d="M290 211 369 290 290 369 211 290 290 211Z" stroke="#8e9bc7" stroke-opacity=".48"/>
-            <circle cx="290" cy="290" r="70" fill="#a58bda" opacity=".12" filter="url(#glow)"/>
-            <path d="M331 251c-16-23-53-26-74-5-25 25-17 63 12 75 23 10 52-3 59-25 6-19-6-41-23-44-17-4-31 8-31 21 0 11 8 18 16 17 7-1 10-8 7-13" stroke="#f1d08f" stroke-opacity=".45" stroke-width="10" stroke-linecap="round" filter="url(#glow)"/>
-            <path d="M331 251c-16-23-53-26-74-5-25 25-17 63 12 75 23 10 52-3 59-25 6-19-6-41-23-44-17-4-31 8-31 21 0 11 8 18 16 17 7-1 10-8 7-13" stroke="url(#bright)" stroke-width="3" stroke-linecap="round"/>
-            <path d="M290 176v13M290 391v13M176 290h13M391 290h13" stroke="#d4b278" stroke-width="1.3"/>
-            <g fill="#ecd4aa"><circle cx="76" cy="170" r="2.5"/><circle cx="480" cy="398" r="2"/><circle cx="407" cy="64" r="1.6"/><circle cx="128" cy="456" r="1.8"/></g>
-            <g stroke="#b1a5e8" stroke-linecap="round"><path d="M480 143v14m-7-7h14"/><path d="M107 379v12m-6-6h12"/><path d="M373 500v13m-6-6h12"/></g>
-          </svg>
-          <div class="float-chip chip-a"><small>Spells &amp; encounters</small><strong>NOT AS YOU REMEMBER</strong></div>
-          <div class="float-chip chip-b"><small>Choose your realm</small><strong>FOLLOW THE UNEXPECTED</strong></div>
-        </div>
-      </div>
-      <div class="scroll-prompt" aria-hidden="true">DISCOVER THE UNKNOWN</div>
-    </section>
-    <div class="rule"></div>
-    <section class="section shell" id="experience">
-      <div class="section-heading"><span class="eyebrow">A DIFFERENT KIND OF ADVENTURE</span><h2>The world you love.<br>The rules you don't know.</h2><p>Spiral Shuffle adds a randomizer twist to classic magical adventures. Familiar places become a fresh challenge when the unexpected is part of the journey.</p></div>
-      <div class="feature-grid">
-        <article class="feature"><span class="feature-number" aria-hidden="true">01</span><div class="feature-icon" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m23 5-10 15 7 2-3 13 12-19-8-1 2-10Z"/><circle cx="20" cy="20" r="18" stroke-opacity=".28"/></svg></div><h3>Magic, remixed</h3><p>Rediscover your spellbook with randomized possibilities and new combinations to uncover.</p></article>
-        <article class="feature"><span class="feature-number" aria-hidden="true">02</span><div class="feature-icon" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 29c-5-8-3-18 10-23 13 5 15 15 10 23l-10 6-10-6Z"/><path d="m11 19 8 3m10-3-8 3M14 27l6 2 6-2"/><circle cx="20" cy="12" r="2" fill="currentColor" stroke="none"/></svg></div><h3>Unpredictable encounters</h3><p>Old foes can bring new surprises. Rethink your strategy and embrace the chaos.</p></article>
-        <article class="feature"><span class="feature-number" aria-hidden="true">03</span><div class="feature-icon" aria-hidden="true"><svg width="34" height="34" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 15h24v18H8V15ZM6 10h28v5H6zM20 10V6"/><path d="M16 15v18m8-18v18M17 23h6"/><path d="m20 5 2 3-2 2-2-2 2-3" fill="currentColor"/></svg></div><h3>Treasure awaits</h3><p>Find unexpected rewards as you explore, battle and make each run your own.</p></article>
-      </div>
-    </section>
-    <section class="section how-section" id="how-to-play">
-      <div class="shell">
-        <div class="section-heading"><span class="eyebrow">YOUR PATH TO THE SPIRAL</span><h2>Three steps to the unexpected.</h2><p>Play on the independent community server using your own compatible Windows game installation.</p></div>
-        <div class="steps-grid">
-          <div class="step"><div class="step-count">01</div><h3>Create your account</h3><p>Choose your unique Spiral Shuffle username and password when registration opens. You won't need your official game account.</p></div>
-          <div class="step"><div class="step-count">02</div><h3>Prepare your client</h3><p>Use a legally obtained Windows client compatible with revision <strong>r806919.Wizard_1_610</strong>. Keep it separate from your regular install.</p></div>
-          <div class="step"><div class="step-count">03</div><h3>Enter the world</h3><p>Launch your compatible client pointed at this server's public IP and port <strong>12010</strong>, then sign in with your new account.</p></div>
-        </div>
-      </div>
-    </section>
-    <div class="rule"></div>
-    <section class="gateway-section shell" id="join">
-      <div class="gateway">
-        <div class="gateway-copy">
-          <span class="eyebrow">THE GATEWAY AWAITS</span>
-          <h2>Your story starts here.</h2>
-          <p>One account. A whole new journey. Join the community and see what the Spiral has in store for you.</p>
-          <div class="connect-label">SERVER CONNECTION</div>
-          <div class="address-box"><code id="server-address">Address coming soon</code><button id="copy-address" class="copy-button" type="button" aria-label="Copy server address" disabled><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button></div>
-          <p class="gateway-note" id="address-note">The public server address will be shown here once it is configured.</p>
-        </div>
-        <div class="signup">
-          <div class="signup-header"><h3>Create an account</h3><span class="mode-badge" id="registration-mode">COMING SOON</span></div>
-          <p class="form-intro" id="registration-intro">The registration interface is ready. New account creation will open once the secure registration service is connected.</p>
-          <div class="form-message" id="form-message" role="status" aria-live="polite"></div>
-          <form id="signup-form" autocomplete="on">
-            <div class="input-group"><label for="username">Wizard username</label><input id="username" name="username" placeholder="Choose a username" autocomplete="username" minlength="3" maxlength="20" pattern="[a-z][a-z0-9_]{2,19}" title="3–20 lowercase letters, digits or underscores, beginning with a letter" required disabled></div>
-            <div class="field-row">
-              <div class="input-group"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" placeholder="12–32 characters" minlength="12" maxlength="32" required disabled></div>
-              <div class="input-group"><label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="12" maxlength="32" required disabled></div>
-            </div>
-            <div id="turnstile-holder" style="min-height:0;margin:12px 0"></div>
-            <button id="submit-signup" class="button button-gold signup-action" type="submit" disabled>REGISTRATION NOT YET OPEN <span class="arrow" aria-hidden="true">↗</span></button>
-            <p class="form-note">Use a new password for this server, never your official Wizard101 password. Registration requires a separate secure API.</p>
-          </form>
-        </div>
-      </div>
-    </section>
-    <section class="faq-section shell" id="faq">
-      <div class="faq-layout">
-        <div><span class="eyebrow">NEED TO KNOW</span><h2>Questions from<br>the other side.</h2><p class="faq-sub">A few things to know before you begin your own journey through the shuffled Spiral.</p></div>
-        <div>
-          <details><summary>Is this the official Wizard101 server?</summary><p>No. Spiral Shuffle is an independent fan-made randomizer project and is not affiliated with, endorsed by or operated by KingsIsle Entertainment.</p></details>
-          <details><summary>Do I use my official Wizard101 login?</summary><p>No. Spiral Shuffle uses its own accounts. When registration is available, make a separate username and password here; never reuse your official game credentials.</p></details>
-          <details><summary>Can I play with friends in another house?</summary><p>Yes, once the server's public game connection is enabled. Everyone needs a compatible client and their own account to connect.</p></details>
-          <details><summary>Where can I get the game client?</summary><p>You will need your own legally obtained, compatible installation. This website does not host or distribute copyrighted game client files or proprietary assets.</p></details>
-          <details><summary>Why can't I sign up yet?</summary><p>This website runs on GitHub Pages, which hosts static files only. Account registration will become available when a secure registration API is connected to the live Imlight server.</p></details>
-        </div>
-      </div>
+  <div class="scene" aria-hidden="true">
+    <canvas id="liquid"></canvas>
+    <div class="grain"></div>
+  </div>
+
+  <main class="center">
+    <section class="panel" aria-label="Spiral Shuffle account registration">
+      <h1>Spiral Shuffle</h1>
+
+      <div id="server-address" class="ip pending" aria-label="Game server address">IP COMING SOON</div>
+
+      <form id="signup-form" autocomplete="on">
+        <label for="username" class="sr-only">Username</label>
+        <input class="input" id="username" name="username" type="text"
+          placeholder="Username" autocomplete="username" autocapitalize="none"
+          autocorrect="off" spellcheck="false"
+          minlength="3" maxlength="20" pattern="[a-z][a-z0-9_]{2,19}"
+          title="3–20 lowercase letters, digits or underscores, starting with a letter"
+          required disabled>
+
+        <label for="password" class="sr-only">Password</label>
+        <input class="input" id="password" name="password" type="password"
+          placeholder="Password" autocomplete="new-password"
+          minlength="12" maxlength="32"
+          title="12–32 characters without spaces" required disabled>
+
+        <div class="verification" id="verification"></div>
+
+        <button class="button" id="create-account" type="submit" disabled>Create Account</button>
+        <p id="status" class="message sr-only" aria-live="polite">Account registration is not available yet.</p>
+      </form>
     </section>
   </main>
-  <footer class="footer"><div class="shell footer-inner"><div><div class="footer-brand">✧ SPIRAL SHUFFLE</div><p>Independent fan-made project. Not affiliated with KingsIsle Entertainment or the official Wizard101 service. All game-related names and assets belong to their respective owners.</p></div><div class="footer-right">Built for those who wander off the map.<br><a href="https://github.com/HyperColossus/spiral-shuffle" target="_blank" rel="noopener noreferrer">Explore the project on GitHub ↗</a></div></div></footer>
+
   <script>
-    /*
-      Public configuration only. Never put database credentials or API secrets here.
-      gameHost: public host/IP (no port). Used for the copy button.
-      registrationApi: HTTPS endpoint accepting POST JSON {username,password}.
-      An empty registrationApi keeps the registration form safely disabled.
-    */
+    // PUBLIC website settings only. Keep API secrets and passwords off GitHub.
+    // gameHost must be the GAME SERVER'S PUBLIC IP or hostname, not the Pages subdomain.
+    // Leave keys blank until an independently secured HTTPS registration API exists.
     window.SPIRAL_SITE_CONFIG = {
       gameHost: "",
       gamePort: 12010,
@@ -301,121 +236,203 @@
       turnstileSiteKey: ""
     };
   </script>
-  <script>
-    (function () {
-      "use strict";
-      var config = window.SPIRAL_SITE_CONFIG || {};
-      var menu = document.getElementById("menu-toggle");
-      var nav = document.getElementById("primary-nav");
-      menu.addEventListener("click", function () {
-        var open = nav.classList.toggle("open");
-        menu.setAttribute("aria-expanded", String(open));
-        menu.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu");
-      });
-      nav.querySelectorAll("a").forEach(function (link) {
-        link.addEventListener("click", function () { nav.classList.remove("open"); menu.setAttribute("aria-expanded", "false"); });
-      });
 
-      var address = document.getElementById("server-address");
-      var addressNote = document.getElementById("address-note");
-      var copy = document.getElementById("copy-address");
-      var host = typeof config.gameHost === "string" ? config.gameHost.trim() : "";
-      var port = Number.isInteger(config.gamePort) && config.gamePort >= 1 && config.gamePort <= 65535 ? config.gamePort : 12010;
-      if (host && /^[a-zA-Z0-9.-]+$/.test(host)) {
-        var fullAddress = host + ":" + port;
-        address.textContent = fullAddress;
-        addressNote.textContent = "Launch your compatible game client using -L " + host + " " + port + ".";
-        copy.disabled = false;
-        copy.addEventListener("click", async function () {
+  <script>
+    (() => {
+      "use strict";
+      const config = window.SPIRAL_SITE_CONFIG || {};
+      const address = document.getElementById("server-address");
+      const host = typeof config.gameHost === "string" ? config.gameHost.trim() : "";
+      const port = Number.isInteger(config.gamePort) && config.gamePort > 0 && config.gamePort < 65536
+        ? config.gamePort : 12010;
+      if (/^[a-z0-9.-]+$/i.test(host) && host.length < 254) {
+        address.textContent = host + ":" + port;
+        address.classList.remove("pending");
+      }
+
+      const form = document.getElementById("signup-form");
+      const fields = [document.getElementById("username"), document.getElementById("password")];
+      const button = document.getElementById("create-account");
+      const status = document.getElementById("status");
+      const verification = document.getElementById("verification");
+      const api = typeof config.registrationApi === "string" ? config.registrationApi.trim() : "";
+      const siteKey = typeof config.turnstileSiteKey === "string" ? config.turnstileSiteKey.trim() : "";
+      let apiValid = false;
+      try {
+        const url = new URL(api);
+        apiValid = url.protocol === "https:" && !url.username && !url.password && !url.hash;
+      } catch (_) {}
+      // Keep the form locked until BOTH the HTTPS API and bot verification are configured.
+      if (apiValid && /^[a-zA-Z0-9_-]{8,128}$/.test(siteKey)) {
+        const script = document.createElement("script");
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
           try {
-            await navigator.clipboard.writeText(fullAddress);
-            copy.setAttribute("aria-label", "Copied server address");
-            addressNote.textContent = "Copied " + fullAddress + " to your clipboard.";
+            if (!window.turnstile) return;
+            const widget = window.turnstile.render(verification, {
+              sitekey: siteKey,
+              action: "register",
+              theme: "dark",
+              appearance: "interaction-only"
+            });
+            fields.forEach(input => { input.disabled = false; });
+            button.disabled = false;
+            status.textContent = "";
+            status.classList.remove("sr-only");
+            form.addEventListener("submit", async event => {
+              event.preventDefault();
+              const username = fields[0].value.trim();
+              const password = fields[1].value;
+              status.classList.remove("success");
+              if (!/^[a-z][a-z0-9_]{2,19}$/.test(username)) {
+                status.textContent = "Choose a lowercase username, 3–20 characters.";
+                return;
+              }
+              if (!/^[!-~]{12,32}$/.test(password)) {
+                status.textContent = "Use a password of 12–32 characters without spaces.";
+                return;
+              }
+              const token = window.turnstile.getResponse(widget);
+              if (!token) {
+                status.textContent = "Complete the security verification.";
+                return;
+              }
+              button.disabled = true;
+              button.textContent = "Creating…";
+              try {
+                const response = await fetch(api, {
+                  method: "POST",
+                  mode: "cors",
+                  credentials: "omit",
+                  cache: "no-store",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username, password, turnstileToken: token })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                  status.textContent = typeof result.error === "string"
+                    ? result.error : "Registration unavailable. Try again later.";
+                } else {
+                  form.reset();
+                  status.classList.add("success");
+                  status.textContent = "Account created. You can now log in to the game.";
+                }
+              } catch (_) {
+                status.textContent = "Cannot reach the registration service right now.";
+              } finally {
+                window.turnstile.reset(widget);
+                button.textContent = "Create Account";
+                button.disabled = false;
+              }
+            });
           } catch (_) {
-            addressNote.textContent = "Select and copy the displayed address manually.";
+            status.textContent = "Registration isn't available yet.";
           }
+        };
+        script.onerror = () => { status.textContent = "Registration isn't available yet."; };
+        document.head.appendChild(script);
+      }
+
+      // Smooth, procedurally randomized viscous waves — no external assets.
+      const canvas = document.getElementById("liquid");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return;
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const bands = Array.from({ length: 4 }, (_, i) => ({
+        phase: Math.random() * Math.PI * 2,
+        drift: .2 + Math.random() * .22,
+        curls: [
+          { frequency: 1.6 + Math.random(), phase: Math.random() * 6.28, speed: .28 + Math.random() * .12 },
+          { frequency: 4 + Math.random() * 2.8, phase: Math.random() * 6.28, speed: -.17 - Math.random() * .14 },
+          { frequency: 7 + Math.random() * 2.2, phase: Math.random() * 6.28, speed: .09 + Math.random() * .08 }
+        ],
+        base: .48 + i * .105,
+        alpha: .38 - i * .055,
+        colors: [
+          ["#9c80ff", "#5f47c8"],
+          ["#a7b8ff", "#7562e8"],
+          ["#63e6d1", "#2f89ad"],
+          ["#5fdac9", "#165b9c"]
+        ][i]
+      }));
+      const blobs = Array.from({ length: 9 }, (_, i) => ({
+        x: .05 + Math.random() * .9,
+        y: .42 + Math.random() * .5,
+        radius: .09 + Math.random() * .12,
+        shift: Math.random() * 6.28,
+        speed: .08 + Math.random() * .14,
+        color: i % 3 === 0 ? "#bd9cff" : i % 3 === 1 ? "#4ce9d6" : "#6a8fff"
+      }));
+      let width = 0, height = 0, lastFrame = 0, frameId = 0;
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const scale = Math.min(devicePixelRatio || 1, 1.5);
+        canvas.width = Math.max(1, Math.round(rect.width * scale));
+        canvas.height = Math.max(1, Math.round(rect.height * scale));
+        width = canvas.width;
+        height = canvas.height;
+        paint(reduced ? 8 : performance.now() / 1000);
+      }
+      function waveValue(band, x, time) {
+        let value = Math.sin(x * 2.1 + time * band.drift + band.phase) * .60;
+        for (let j = 0; j < band.curls.length; j++) {
+          const curl = band.curls[j];
+          value += Math.sin(x * curl.frequency + time * curl.speed + curl.phase) * (.40 / (j + 1));
+        }
+        return value;
+      }
+      function paint(time) {
+        ctx.clearRect(0, 0, width, height);
+        const span = Math.min(width, height);
+        blobs.forEach(blob => {
+          const x = (blob.x + Math.sin(time * blob.speed + blob.shift) * .035) * width;
+          const y = (blob.y + Math.cos(time * blob.speed * .8 + blob.shift) * .07) * height;
+          const r = span * blob.radius;
+          const halo = ctx.createRadialGradient(x, y, 2, x, y, r);
+          halo.addColorStop(0, blob.color + "66");
+          halo.addColorStop(1, blob.color + "00");
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        bands.forEach((band, i) => {
+          const level = band.base * height;
+          const amp = height * (.045 + i * .009);
+          ctx.beginPath();
+          for (let x = 0; x <= width + 15; x += 12) {
+            const xx = Math.min(x, width);
+            const yy = level + waveValue(band, xx / width * Math.PI * 2, time) * amp;
+            if (x === 0) ctx.moveTo(xx, yy);
+            else ctx.lineTo(xx, yy);
+          }
+          ctx.lineTo(width, height);
+          ctx.lineTo(0, height);
+          ctx.closePath();
+          const fill = ctx.createLinearGradient(0, level - amp * 2, width * .3, height);
+          fill.addColorStop(0, band.colors[0]);
+          fill.addColorStop(.6, band.colors[1]);
+          fill.addColorStop(1, "#051b41");
+          ctx.globalAlpha = band.alpha;
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = band.colors[0] + "99";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
         });
       }
-
-      var form = document.getElementById("signup-form");
-      var message = document.getElementById("form-message");
-      var submit = document.getElementById("submit-signup");
-      var mode = document.getElementById("registration-mode");
-      var intro = document.getElementById("registration-intro");
-      var api = typeof config.registrationApi === "string" ? config.registrationApi.trim() : "";
-      var validApi = false;
-      try {
-        var apiUrl = new URL(api);
-        validApi = apiUrl.protocol === "https:" && apiUrl.username === "" && apiUrl.password === "" && apiUrl.hash === "";
-      } catch (_) {}
-      var siteKey = typeof config.turnstileSiteKey === "string" ? config.turnstileSiteKey.trim() : "";
-      var validSiteKey = /^[A-Za-z0-9_-]{8,128}$/.test(siteKey);
-      if (!validApi || !validSiteKey) {
-        // Never enable password entry before HTTPS API and CAPTCHA are configured.
-        return;
+      function animate(now) {
+        frameId = requestAnimationFrame(animate);
+        if (document.hidden || now - lastFrame < 33) return;
+        lastFrame = now;
+        paint(now / 1000);
       }
-      var captchaHolder = document.getElementById("turnstile-holder");
-      captchaHolder.className = "cf-turnstile";
-      captchaHolder.setAttribute("data-sitekey", siteKey);
-      captchaHolder.setAttribute("data-action", "register");
-      captchaHolder.setAttribute("data-theme", "dark");
-      var challengeScript = document.createElement("script");
-      challengeScript.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      challengeScript.async = true;
-      challengeScript.defer = true;
-      document.head.appendChild(challengeScript);
-
-      form.querySelectorAll("input").forEach(function (input) { input.disabled = false; });
-      submit.disabled = false;
-      submit.innerHTML = "CREATE MY ACCOUNT <span class='arrow' aria-hidden='true'>↗</span>";
-      mode.textContent = "REGISTRATION OPEN";
-      intro.textContent = "Create a separate Spiral Shuffle account to use when connecting to the game server.";
-
-      function show(text, success) {
-        message.textContent = text;
-        message.classList.add("show");
-        message.classList.toggle("ok", !!success);
-      }
-
-      form.addEventListener("submit", async function (event) {
-        event.preventDefault();
-        message.classList.remove("show");
-        var username = document.getElementById("username").value.trim();
-        var password = document.getElementById("password").value;
-        var confirm = document.getElementById("confirm-password").value;
-        if (!/^[a-z][a-z0-9_]{2,19}$/.test(username)) { show("Use 3–20 lowercase letters, numbers or underscores, beginning with a letter.", false); return; }
-        if (!/^[!-~]{12,32}$/.test(password)) { show("Use 12–32 ASCII characters without spaces.", false); return; }
-        if (password !== confirm) { show("The two passwords do not match.", false); return; }
-        var proof = window.turnstile && typeof window.turnstile.getResponse === "function"
-          ? window.turnstile.getResponse() : "";
-        if (!proof) { show("Complete the bot verification before creating your account.", false); return; }
-        submit.disabled = true;
-        submit.textContent = "CREATING ACCOUNT…";
-        try {
-          var response = await fetch(api, {
-            method: "POST",
-            mode: "cors",
-            credentials: "omit",
-            cache: "no-store",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: username, password: password, turnstileToken: proof })
-          });
-          var result = {};
-          try { result = await response.json(); } catch (_) {}
-          if (!response.ok) {
-            show(typeof result.error === "string" ? result.error : "Registration could not be completed. Please try again.", false);
-            return;
-          }
-          form.reset();
-          show("Account created. You can now use these credentials to sign in to Spiral Shuffle.", true);
-        } catch (_) {
-          show("Could not reach the registration service. Please try again later.", false);
-        } finally {
-          if (window.turnstile && typeof window.turnstile.reset === "function") window.turnstile.reset();
-          submit.disabled = false;
-          submit.innerHTML = "CREATE MY ACCOUNT <span class='arrow' aria-hidden='true'>↗</span>";
-        }
-      });
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+      if (!reduced) frameId = requestAnimationFrame(animate);
     })();
   </script>
 </body>
