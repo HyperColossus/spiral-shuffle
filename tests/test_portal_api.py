@@ -52,7 +52,7 @@ class RegistrationApiTests(unittest.TestCase):
             with mock.patch.object(api, "ROOT", root), mock.patch.object(api, "PRIVATE", private):
                 with mock.patch.dict(os.environ, {
                     "SPIRAL_PORTAL_PUBLIC": "1",
-                    "SPIRAL_ALLOWED_ORIGIN": "https://hypercolossus.github.io",
+                    "SPIRAL_ALLOWED_ORIGIN": "https://spiral.hypercoloss.us",
                     "SPIRAL_TURNSTILE_SECRET": "",
                 }, clear=True):
                     with self.assertRaisesRegex(ValueError, "TURNSTILE_SECRET"):
@@ -60,7 +60,7 @@ class RegistrationApiTests(unittest.TestCase):
 
     def test_browser_preflight_allows_only_github_pages_origin(self):
         settings = type("Fake", (), {
-            "origin": "https://hypercolossus.github.io", "public": False,
+            "origin": "https://spiral.hypercoloss.us", "public": False,
             "ip_salt": "demo", "bridge_token": "x" * 64,
         })()
         api.Handler.settings = settings
@@ -70,7 +70,7 @@ class RegistrationApiTests(unittest.TestCase):
         try:
             url = f"http://127.0.0.1:{server.server_port}/register"
             req = Request(url, method="OPTIONS", headers={
-                "Origin": "https://hypercolossus.github.io",
+                "Origin": "https://spiral.hypercoloss.us",
                 "Access-Control-Request-Headers": "content-type",
             })
             with urlopen(req, timeout=2) as resp:
@@ -91,7 +91,7 @@ class RegistrationApiTests(unittest.TestCase):
 
     def test_registration_does_not_return_a_password(self):
         settings = type("Fake", (), {
-            "origin": "https://hypercolossus.github.io", "public": False,
+            "origin": "https://spiral.hypercoloss.us", "public": False,
             "ip_salt": "demo", "bridge_token": "x" * 64,
         })()
         api.Handler.settings = settings
