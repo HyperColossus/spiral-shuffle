@@ -4,6 +4,8 @@
 
 The **website stays on GitHub Pages** at https://spiral.hypercoloss.us/ . This add-on supplies only the server-side API that GitHub Pages cannot run.
 
+**Docker database option:** To use RavenDB in a dedicated Docker container instead of Imlight's embedded server, complete the backup, import and switch procedure in [docker/README.md](docker/README.md) **before installing the registration bridge**. The website and Imlight must use the same Playerdata database. Do not point the public website at RavenDB.
+
 ## Architecture
 
 GitHub Pages (HTTPS static form) -> your registration HTTPS hostname, such as `https://register.example.com/register` -> **Caddy** -> `127.0.0.1:12771` (`portal_api.py`) -> authenticated `127.0.0.1:12772` (`PortalRegistration.cs` inside Imlight) -> **existing Imlight PlayerDatabase/RavenDB**.
