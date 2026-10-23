@@ -1,0 +1,17 @@
+# Example only. Add this site block to your EXISTING Caddyfile.
+# Choose a NEW registration subdomain; never overwrite your other website.
+# Point register.example.com DNS to your HTTPS reverse-proxy server.
+# The API is always bound on 127.0.0.1; do not open ports 12771 or 12772.
+
+register.example.com {
+    @register path /register
+    handle @register {
+        reverse_proxy 127.0.0.1:12771 {
+            # MUST overwrite caller's X-Real-IP to keep rate limits trustworthy.
+            header_up X-Real-IP {remote_host}
+        }
+    }
+    handle {
+        respond "Not found" 404
+    }
+}
