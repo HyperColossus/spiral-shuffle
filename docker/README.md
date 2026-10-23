@@ -1,6 +1,6 @@
 # Spiral Shuffle — Docker RavenDB player database
 
-**Status:** staged in GitHub, NOT running on your Ubuntu machine until you run the commands.
+**Status:** The owner has started Docker RavenDB successfully (HTTP 200 on `/build/version`); database creation and Imlight switch are separate steps.
 **Scope:** database only. The six Imlight realms and Python signup API still run on Ubuntu. The website stays on GitHub Pages at https://spiral.hypercoloss.us/.
 
 Imlight's pinned code explicitly supports an external RavenDB connection via `[Database] PlayerDatabaseUrl`. This is **not PostgreSQL or MySQL**: Imlight stores `Accounts`, `Wizards`, and related documents in RavenDB. Docker is a container runtime, not a database type.
@@ -56,6 +56,47 @@ curl -I http://127.0.0.1:18080
 If RavenDB requires license/EULA acceptance, review and accept those terms yourself through its documented setup; this project does not accept them on your behalf.
 
 **Do not switch Imlight.ini yet.** At this stage a new RavenDB instance is empty.
+
+## Fresh installation (selected: no old accounts or characters to keep)
+
+**Choose this section INSTEAD of the import/export migration sections below.** Your previous folders `.runtime/saves` and `.runtime/saves-login-test-dvuuty_v` remain untouched. You don't need to run or tunnel to the old embedded RavenDB on port 8090.
+
+1. On **Windows PowerShell**, open a private SSH tunnel to the Docker RavenDB on Ubuntu:
+
+   ```powershell
+   ssh -N -L 18080:127.0.0.1:18080 hypercolossus@192.168.95.76
+   ```
+
+   Keep the PowerShell window open and visit `http://127.0.0.1:18080` in a browser. This uses only your local SSH tunnel; do **not** publish Docker RavenDB in Cloudflare or your router.
+
+2. In RavenDB Studio, open **Databases → New database**, name it exactly **`Playerdata`**, choose **Regular / non-sharded** and a replication factor of **1**, and create it **empty**. Do not import your old files or add sample data. If `Playerdata` already exists, inspect it rather than deleting it.
+
+3. On Ubuntu, the game is currently stopped. Before creating a fresh game admin account, edit the live config privately:
+
+   ```bash
+   cd ~/spiral-shuffle
+   nano .runtime/server/Config/Imlight.ini
+   ```
+
+   Set `AdminAccountPassword` to a **new, unique password of at least 16 characters**, save it securely, and **do not paste the password into a terminal command, commit, or chat**. This password will be used for the initial `admin` game account created in the new empty database. Other settings, especially `EmbeddedDatabaseDataDirectory`, can stay as they are; this switch won't delete those folders.
+
+4. Verify that the Docker database is still **empty** and switch explicitly:
+
+   ```bash
+   python3 docker/db_config.py check --start-fresh
+   python3 docker/db_config.py switch --start-fresh
+   ./Play-Linux.sh
+   python3 linux_ctl.py status
+   ```
+
+   The command refuses an inaccessible, missing, or nonempty `Playerdata`, refuses a weak admin password, refuses a running game, and backs up the old `Imlight.ini`. After startup, the administrator should be created by Imlight in Docker. Test the new admin login and creating a wizard locally before inviting friends. **The website signup button remains disabled until the registration API and Turnstile are deployed.**
+
+5. If the game fails to start, **don't delete the Docker volume** or old save directories. Review `.runtime/logs/server.log` and follow the rollback instructions below if needed.
+
+### Stop here if you chose fresh start
+Do not run the import steps or `--confirm-imported` below. Continue to [README-PORTAL.md](../README-PORTAL.md) only after the fresh database and game login work.
+
+---
 
 ## 2. Export existing player records first
 
