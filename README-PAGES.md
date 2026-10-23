@@ -10,9 +10,17 @@ The site is committed to the existing public repository, `HyperColossus/spiral-s
 2. Under **Build and deployment**, choose **Deploy from a branch**.
 3. Set branch **main**, folder **/docs**, then **Save**.
 4. After the first deployment, the expected address is:
-   https://hypercolossus.github.io/spiral-shuffle/
+   https://spiral.hypercoloss.us/
 
-This GitHub Pages setting requires action by the repository owner. Publishing depends on GitHub Pages settings and deployment status; source files alone do not guarantee the page is live.
+GitHub Pages is configured with a project-specific CNAME file, but the domain requires the DNS record below and confirmation in Pages settings.
+
+## Spiral Shuffle custom subdomain
+
+- Site hostname: **spiral.hypercoloss.us** (no `/spiral-shuffle/` path).
+- Publishing source: **main /docs**, CNAME file: `docs/CNAME`.
+- At the DNS provider for `hypercoloss.us`, create a **CNAME** named `spiral` pointing to **`hypercolossus.github.io`** (no path, no protocol). Do not alter existing `@` or `www` DNS records for the portfolio.
+- In https://github.com/HyperColossus/spiral-shuffle/settings/pages confirm **Custom domain** is `spiral.hypercoloss.us`, run **Check DNS** if offered, then use **Enforce HTTPS** after the certificate is available. GitHub's settings may be needed even when a CNAME file has been committed.
+- DNS changes can take up to 24 hours to resolve.
 
 ## Edit the public-facing connection details
 
