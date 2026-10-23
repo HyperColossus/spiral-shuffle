@@ -16,6 +16,22 @@ Imlight's pinned code explicitly supports an external RavenDB connection via `[D
 
 **Unsecured local HTTP is for single-host development only.** Restrict local machine access to trusted users. If you later move the DB to a separate host, replace it with RavenDB TLS and certificate-based authentication; NEVER publish port 18080.
 
+### Why RavenDB requires PublicNetwork inside this container
+
+RavenDB 7.2 returns **HTTP 503** if `RAVEN_ServerUrl=http://0.0.0.0:8080` is combined with `Security.UnsecuredAccessAllowed=PrivateNetwork`. The container must bind its own network interface so Docker can forward the port, so this Compose project uses `RAVEN_Security_UnsecuredAccessAllowed=PublicNetwork` **inside Docker only**. That setting does not provide authentication: any host or container able to reach the RavenDB service can read/write its data. The Docker **host** port remains bound to `127.0.0.1:18080`, not the Ubuntu LAN or public IP, and Compose gives this service a separate project network. Do not attach untrusted containers, open host firewall/router ports, or proxy this database. For a less isolated or production deployment, provision TLS and RavenDB client certificates instead.
+
+If you already started the older Compose file and get 503, update safely:
+
+```bash
+cd ~/spiral-shuffle
+git pull --ff-only
+sudo docker compose -f docker/ravendb.compose.yml up -d
+curl -sS -i --max-time 10 http://127.0.0.1:18080/build/version
+```
+
+This recreates the service if the configuration changed but **does not delete its named volume**. Never use `docker compose down -v`.
+
+
 ## 1. Inspect Docker and start the dedicated service
 
 On Ubuntu:
