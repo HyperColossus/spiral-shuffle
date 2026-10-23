@@ -12,7 +12,7 @@ The site is committed to the existing public repository, `HyperColossus/spiral-s
 4. After the first deployment, the expected address is:
    https://hypercolossus.github.io/spiral-shuffle/
 
-This GitHub Pages setting requires action by the repository owner. The site is **not live** solely because these files are committed.
+This GitHub Pages setting requires action by the repository owner. Publishing depends on GitHub Pages settings and deployment status; source files alone do not guarantee the page is live.
 
 ## Edit the public-facing connection details
 
@@ -22,13 +22,15 @@ Open `docs/index.html` in GitHub and locate `window.SPIRAL_SITE_CONFIG` near the
 window.SPIRAL_SITE_CONFIG = {
   gameHost: "",
   gamePort: 12010,
-  registrationApi: ""
+  registrationApi: "",
+  turnstileSiteKey: ""
 };
 ```
 
 - **gameHost:** public IPv4 or hostname of the **Ubuntu game server** (not your Windows PC and not a Tailscale address). Leave empty until the internet-facing game server is actually reachable.
 - **gamePort:** currently `12010` for game login. Realm ports `12343–12348` must separately be accessible.
-- **registrationApi:** leave empty for a UI-only site. Set it to a **public HTTPS API URL** (e.g. `https://api.example.com/register`) after a secure, independently hosted registration backend has been deployed and tested. Never point it at private RavenDB or its 8090 port.
+- **registrationApi:** leave empty for a UI-only site. Set it to the **public HTTPS API URL** after your server-side registration API is deployed and tested (e.g. `https://register.example.com/register`).
+- **turnstileSiteKey:** leave empty until Cloudflare Turnstile has been configured for your GitHub Pages hostname. This is a public site key, **not the secret**. Both values must be populated for the form to become active.
 
 GitHub Pages cannot run Python, PHP, ASP.NET, a game server or a password database. It can render the page and send browser requests to an independently hosted HTTPS registration service.
 
@@ -40,7 +42,7 @@ Frontend request:
 POST /register
 Content-Type: application/json
 
-{"username":"Player_123","password":"unique-long-password"}
+{"username":"player_123","password":"unique-long-password","turnstileToken":"CLOUDFLARE_TOKEN"}
 ```
 
 - Successful account creation: return status `201` (or another 2xx), optionally JSON `{"message":"Created"}`.
@@ -60,3 +62,7 @@ Open `docs/index.html` in a browser. No backend is needed to preview the design.
 ## Branding
 
 Independent fan-made project. Not affiliated with, approved by, or endorsed by KingsIsle Entertainment. The site does not include or distribute a Wizard101 executable or copyrighted game files.
+
+## Backend
+
+The backend source, Imlight registration bridge, Ubuntu installation instructions, automated tests and HTTPS proxy configuration are included in this same repository. See [README-PORTAL.md](README-PORTAL.md). The API is not deployed merely by publishing GitHub Pages.
