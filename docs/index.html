@@ -261,11 +261,12 @@
           <p class="form-intro" id="registration-intro">The registration interface is ready. New account creation will open once the secure registration service is connected.</p>
           <div class="form-message" id="form-message" role="status" aria-live="polite"></div>
           <form id="signup-form" autocomplete="on">
-            <div class="input-group"><label for="username">Wizard username</label><input id="username" name="username" placeholder="Choose a username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" title="3–24 letters, numbers or underscores" required disabled></div>
+            <div class="input-group"><label for="username">Wizard username</label><input id="username" name="username" placeholder="Choose a username" autocomplete="username" minlength="3" maxlength="20" pattern="[a-z][a-z0-9_]{2,19}" title="3–20 lowercase letters, digits or underscores, beginning with a letter" required disabled></div>
             <div class="field-row">
-              <div class="input-group"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" placeholder="At least 12 characters" minlength="12" maxlength="72" required disabled></div>
-              <div class="input-group"><label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="12" maxlength="72" required disabled></div>
+              <div class="input-group"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" placeholder="12–32 characters" minlength="12" maxlength="32" required disabled></div>
+              <div class="input-group"><label for="confirm-password">Confirm password</label><input id="confirm-password" type="password" autocomplete="new-password" placeholder="Repeat password" minlength="12" maxlength="32" required disabled></div>
             </div>
+            <div id="turnstile-holder" style="min-height:0;margin:12px 0"></div>
             <button id="submit-signup" class="button button-gold signup-action" type="submit" disabled>REGISTRATION NOT YET OPEN <span class="arrow" aria-hidden="true">↗</span></button>
             <p class="form-note">Use a new password for this server, never your official Wizard101 password. Registration requires a separate secure API.</p>
           </form>
@@ -296,7 +297,8 @@
     window.SPIRAL_SITE_CONFIG = {
       gameHost: "",
       gamePort: 12010,
-      registrationApi: ""
+      registrationApi: "",
+      turnstileSiteKey: ""
     };
   </script>
   <script>
@@ -346,10 +348,22 @@
         var apiUrl = new URL(api);
         validApi = apiUrl.protocol === "https:" && apiUrl.username === "" && apiUrl.password === "" && apiUrl.hash === "";
       } catch (_) {}
-      if (!validApi) {
-        // Do not enable password entry when there is nowhere safe to send it.
+      var siteKey = typeof config.turnstileSiteKey === "string" ? config.turnstileSiteKey.trim() : "";
+      var validSiteKey = /^[A-Za-z0-9_-]{8,128}$/.test(siteKey);
+      if (!validApi || !validSiteKey) {
+        // Never enable password entry before HTTPS API and CAPTCHA are configured.
         return;
       }
+      var captchaHolder = document.getElementById("turnstile-holder");
+      captchaHolder.className = "cf-turnstile";
+      captchaHolder.setAttribute("data-sitekey", siteKey);
+      captchaHolder.setAttribute("data-action", "register");
+      captchaHolder.setAttribute("data-theme", "dark");
+      var challengeScript = document.createElement("script");
+      challengeScript.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      challengeScript.async = true;
+      challengeScript.defer = true;
+      document.head.appendChild(challengeScript);
 
       form.querySelectorAll("input").forEach(function (input) { input.disabled = false; });
       submit.disabled = false;
@@ -369,9 +383,12 @@
         var username = document.getElementById("username").value.trim();
         var password = document.getElementById("password").value;
         var confirm = document.getElementById("confirm-password").value;
-        if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) { show("Use 3–24 letters, numbers or underscores for your username.", false); return; }
-        if (password.length < 12 || password.length > 72) { show("Use a password between 12 and 72 characters.", false); return; }
+        if (!/^[a-z][a-z0-9_]{2,19}$/.test(username)) { show("Use 3–20 lowercase letters, numbers or underscores, beginning with a letter.", false); return; }
+        if (!/^[!-~]{12,32}$/.test(password)) { show("Use 12–32 ASCII characters without spaces.", false); return; }
         if (password !== confirm) { show("The two passwords do not match.", false); return; }
+        var proof = window.turnstile && typeof window.turnstile.getResponse === "function"
+          ? window.turnstile.getResponse() : "";
+        if (!proof) { show("Complete the bot verification before creating your account.", false); return; }
         submit.disabled = true;
         submit.textContent = "CREATING ACCOUNT…";
         try {
@@ -381,7 +398,7 @@
             credentials: "omit",
             cache: "no-store",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: username, password: password })
+            body: JSON.stringify({ username: username, password: password, turnstileToken: proof })
           });
           var result = {};
           try { result = await response.json(); } catch (_) {}
@@ -394,6 +411,7 @@
         } catch (_) {
           show("Could not reach the registration service. Please try again later.", false);
         } finally {
+          if (window.turnstile && typeof window.turnstile.reset === "function") window.turnstile.reset();
           submit.disabled = false;
           submit.innerHTML = "CREATE MY ACCOUNT <span class='arrow' aria-hidden='true'>↗</span>";
         }
