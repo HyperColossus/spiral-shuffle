@@ -37,7 +37,7 @@ class RegistrationApiTests(unittest.TestCase):
     def test_settings_fail_closed_without_private_bridge_token(self):
         with tempfile.TemporaryDirectory() as folder, mock.patch.object(api, "PRIVATE", Path(folder)):
             with mock.patch.dict(os.environ, {"SPIRAL_PORTAL_PUBLIC": "0"}, clear=True):
-                with self.assertRaisesRegex(ValueError, "bridge token"):
+                with self.assertRaisesRegex(ValueError, "portal_bridge.py init/install"):
                     api.Settings()
 
     def test_settings_require_captcha_in_public_mode(self):
