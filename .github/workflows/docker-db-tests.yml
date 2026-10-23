@@ -1,0 +1,37 @@
+name: Docker DB and portal guard checks
+
+on:
+  push:
+    paths:
+      - 'docker/**'
+      - 'portal_api.py'
+      - 'portal_bridge.py'
+      - 'tests/test_docker_db.py'
+      - 'tests/test_portal_api.py'
+      - '.github/workflows/docker-db-tests.yml'
+  pull_request:
+    paths:
+      - 'docker/**'
+      - 'portal_api.py'
+      - 'portal_bridge.py'
+      - 'tests/test_docker_db.py'
+      - 'tests/test_portal_api.py'
+      - '.github/workflows/docker-db-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax checks
+        run: python3 -m py_compile docker/db_config.py portal_api.py portal_bridge.py tests/test_docker_db.py tests/test_portal_api.py
+      - name: Docker Compose validation (no container startup)
+        run: docker compose -f docker/ravendb.compose.yml config --quiet
+      - name: Test migration safeguards
+        run: python3 -m unittest discover -s tests -p 'test_docker_db.py' -v
+      - name: Test registration validation
+        run: python3 -m unittest discover -s tests -p 'test_portal_api.py' -v
