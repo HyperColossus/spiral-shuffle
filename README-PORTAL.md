@@ -2,7 +2,7 @@
 
 **Status:** Source code committed; requires installation and real-account testing on the owner's Ubuntu server. Public signups are disabled until configured.
 
-The **website stays on GitHub Pages** at https://hypercolossus.github.io/spiral-shuffle/ . This add-on supplies only the server-side API that GitHub Pages cannot run.
+The **website stays on GitHub Pages** at https://spiral.hypercoloss.us/ . This add-on supplies only the server-side API that GitHub Pages cannot run.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ The default private `portal.env` has `SPIRAL_PORTAL_PUBLIC=0`. Keep this process
 ```bash
 curl -fsS http://127.0.0.1:12771/health
 curl -i -X OPTIONS http://127.0.0.1:12771/register \
-  -H 'Origin: https://hypercolossus.github.io' \
+  -H 'Origin: https://spiral.hypercoloss.us' \
   -H 'Access-Control-Request-Method: POST' \
   -H 'Access-Control-Request-Headers: content-type'
 ```
@@ -71,7 +71,7 @@ password = getpass.getpass("New password (12-32 ASCII, no spaces): ")
 req = urllib.request.Request(
     "http://127.0.0.1:12771/register",
     data=json.dumps({"username": username, "password": password}).encode(),
-    headers={"Origin": "https://hypercolossus.github.io",
+    headers={"Origin": "https://spiral.hypercoloss.us",
              "Content-Type": "application/json"},
     method="POST")
 with urllib.request.urlopen(req, timeout=30) as response:
@@ -86,12 +86,12 @@ A response of **201** means Imlight reports account creation. Log into the game 
 Because you already have another website, choose a **separate DNS subdomain**, e.g. `register.yourdomain.com`. Do not overwrite any existing site's files or web-server configuration.
 
 1. Configure DNS so the new subdomain points to the public web/reverse-proxy endpoint. If using direct Caddy, verify the existing router/web-server situation first: another service may already own TCP 80/443. **Do not install a second conflicting web server.** Add `portal/Caddyfile.example` as a separate site block in the *existing* Caddy configuration, adjusting its hostname; adapt equivalently if using Nginx, Apache or a managed HTTPS tunnel.
-2. Create a Cloudflare **Turnstile** widget, allowing the hostname **`hypercolossus.github.io`**, and with action **`register`**. Turnstile's **site key** is public (for the GitHub Pages page); its **secret key** must remain in a server-only environment file.
+2. Create a Cloudflare **Turnstile** widget, allowing the hostname **`spiral.hypercoloss.us`**, and with action **`register`**. Turnstile's **site key** is public (for the GitHub Pages page); its **secret key** must remain in a server-only environment file.
 3. Edit `.runtime/portal/portal.env` (mode 0600) on Ubuntu:
 
 ```ini
 SPIRAL_PORTAL_PUBLIC=1
-SPIRAL_ALLOWED_ORIGIN=https://hypercolossus.github.io
+SPIRAL_ALLOWED_ORIGIN=https://spiral.hypercoloss.us
 SPIRAL_TURNSTILE_SECRET=YOUR_PRIVATE_TURNSTILE_SECRET
 SPIRAL_GAME_HOST=YOUR_PUBLIC_GAME_HOST
 ```
