@@ -4,7 +4,7 @@
 
 The **website stays on GitHub Pages** at https://spiral.hypercoloss.us/ . This add-on supplies only the server-side API that GitHub Pages cannot run.
 
-**Docker database option:** To use RavenDB in a dedicated Docker container instead of Imlight's embedded server, complete the backup, import and switch procedure in [docker/README.md](docker/README.md) **before installing the registration bridge**. The website and Imlight must use the same Playerdata database. Do not point the public website at RavenDB.
+**Docker RavenDB database:** To start with new empty accounts (the selected option), use the **Fresh installation** instructions in [docker/README.md](docker/README.md). To preserve existing characters, use the separate import procedure instead. Complete the appropriate database switch **before installing the registration bridge**. The website and Imlight must use the same `Playerdata` database. Do not point the public website at RavenDB.
 
 ## Architecture
 
@@ -12,9 +12,9 @@ GitHub Pages (HTTPS static form) -> your registration HTTPS hostname, such as `h
 
 Game clients still connect separately to **YOUR GAME SERVER public IP**, port `12010` and realms `12343–12348`. The players' IPs are not their login identities. No admin passwords, bridge tokens, CAPTCHA secrets or database access are ever added to GitHub Pages.
 
-The bridge uses Imlight's own password hashing and `DatabaseUtilities.CreateEmbeddedDatabaseAccount(..., AuthLevel.None)`. It writes to the **database currently configured in Imlight.ini**, so choose your permanent save directory before inviting players.
+The bridge uses Imlight's own password hashing and `DatabaseUtilities.CreateEmbeddedDatabaseAccount(..., AuthLevel.None)`. It writes to the **database currently configured in Imlight.ini**, so finish selecting the permanent Docker database before inviting players.
 
-The API binds **127.0.0.1:12771**, the bridge binds **127.0.0.1:12772**, and RavenDB stays at **127.0.0.1:8090**. Do not forward any of these ports on the router or add UFW public allow rules for them.
+The API binds **127.0.0.1:12771**, the bridge binds **127.0.0.1:12772**, and Docker RavenDB stays at **127.0.0.1:18080** (the old embedded instance used port `8090`). Do not forward any of these ports on the router or add UFW public allow rules for them.
 
 ## A. Install locally on Ubuntu (no asset rebuild)
 
