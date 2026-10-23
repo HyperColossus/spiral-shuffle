@@ -23,14 +23,14 @@ DB_NAME = "Playerdata"
 NO_CERT = ROOT / ".runtime/server/Config/DO-NOT-CREATE-local-docker-certificate.pfx"
 
 def replace_setting(source, key, value):
-    pattern = r"(?m)^(" + re.escape(key) + r"\s*=\s*).*$"
+    pattern = r"(?m)^(" + re.escape(key) + r"[ \t]*=[ \t]*).*$"
     changed, count = re.subn(pattern, lambda m: m.group(1) + value, source)
     if count != 1:
         raise ValueError(f"Expected exactly one {key} setting")
     return changed
 
 def get_setting(source, key):
-    result = re.findall(r"(?m)^" + re.escape(key) + r"\s*=\s*(.*?)\s*$", source)
+    result = re.findall(r"(?m)^" + re.escape(key) + r"[ \t]*=[ \t]*([^\r\n]*)$", source)
     if len(result) != 1:
         raise ValueError(f"Expected exactly one {key} setting")
     return result[0]
