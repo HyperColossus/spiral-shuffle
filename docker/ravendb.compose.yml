@@ -7,14 +7,16 @@ services:
     image: ravendb/ravendb:7.2.6-ubuntu.24.04-x64
     restart: unless-stopped
     ports:
-      - "127.0.0.1:18080:8080"
+      - "127.0.0.1:18080:18080"
     environment:
       RAVEN_Setup_Mode: "None"
       # RavenDB treats an all-interface container bind (0.0.0.0) as PublicNetwork.
       # This disables database authentication inside the isolated Docker network.
       # CRITICAL: KEEP the host port published to 127.0.0.1 ONLY; never expose it.
       RAVEN_Security_UnsecuredAccessAllowed: "PublicNetwork"
-      RAVEN_ServerUrl: "http://0.0.0.0:8080"
+      RAVEN_ServerUrl: "http://0.0.0.0:18080"
+      # PublicServerUrl must be reachable by this single node from WITHIN
+      # its own network namespace. Use the same HTTP port inside and out.
       RAVEN_PublicServerUrl: "http://127.0.0.1:18080"
     volumes:
       - spiral_data:/var/lib/ravendb/data
