@@ -32,12 +32,12 @@ RESERVED = frozenset(("admin", "administrator", "moderator", "support",
 class Settings:
     def __init__(self):
         self.public = os.getenv("SPIRAL_PORTAL_PUBLIC", "0") == "1"
-        self.origin = os.getenv("SPIRAL_ALLOWED_ORIGIN", "https://hypercolossus.github.io").rstrip("/")
+        self.origin = os.getenv("SPIRAL_ALLOWED_ORIGIN", "https://spiral.hypercoloss.us").rstrip("/")
         url = urlsplit(self.origin)
         if (url.scheme not in ("https", "http") or not url.hostname or
                 url.path or url.query or url.fragment or url.username or url.password):
             raise ValueError("SPIRAL_ALLOWED_ORIGIN must be an exact browser origin without a path.")
-        if self.public and (url.scheme != "https" or self.origin != "https://hypercolossus.github.io"):
+        if self.public and (url.scheme != "https" or self.origin != "https://spiral.hypercoloss.us"):
             raise ValueError("Public mode requires the configured HTTPS GitHub Pages origin.")
         self.turnstile_secret = os.getenv("SPIRAL_TURNSTILE_SECRET", "")
         self.host = url.hostname
