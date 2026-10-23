@@ -117,7 +117,10 @@ class DockerDBTests(TestCase):
         # The 0.0.0.0 bind is INSIDE the container. The published host port
         # MUST remain loopback-only because RavenDB HTTP has no auth here.
         self.assertIn('RAVEN_Security_UnsecuredAccessAllowed: "PublicNetwork"', compose)
-        self.assertIn('"127.0.0.1:18080:8080"', compose)
+        self.assertIn('"127.0.0.1:18080:18080"', compose)
+        self.assertIn('RAVEN_ServerUrl: "http://0.0.0.0:18080"', compose)
+        self.assertIn('RAVEN_PublicServerUrl: "http://127.0.0.1:18080"', compose)
+        self.assertNotIn('"127.0.0.1:18080:8080"', compose)
         self.assertNotIn('"0.0.0.0:18080:8080"', compose)
         self.assertNotIn('"18080:8080"', compose)
 
