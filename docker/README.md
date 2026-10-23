@@ -57,6 +57,24 @@ If RavenDB requires license/EULA acceptance, review and accept those terms yours
 
 **Do not switch Imlight.ini yet.** At this stage a new RavenDB instance is empty.
 
+## Troubleshooting: `Playerdata` creation fails with `Connection refused (127.0.0.1:18080)`
+
+An older Docker Compose configuration forwarded Ubuntu port **18080** to container port **8080**, while RavenDB advertised `PublicServerUrl=http://127.0.0.1:18080`. During Raft operations inside the container, 127.0.0.1 referred to **the container**, where nothing listened on 18080. This caused database creation to fail even though `/build/version` on Ubuntu returned HTTP 200. See [RavenDB networking requirements](https://docs.ravendb.net/7.1/start/containers/requirements/networking).
+
+The fixed Compose file now binds RavenDB on **0.0.0.0:18080 inside Docker**, publishes **127.0.0.1:18080:18080 on Ubuntu**, and advertises **http://127.0.0.1:18080**. Both the internal node and Ubuntu client can reach the advertised URL; the host's exposed port stays loopback-only.
+
+```bash
+cd ~/spiral-shuffle
+git pull --ff-only
+sudo docker compose -f docker/ravendb.compose.yml up -d
+sudo docker compose -f docker/ravendb.compose.yml ps
+curl -sS -i --max-time 10 http://127.0.0.1:18080/build/version
+```
+
+The first `curl` immediately after container recreation may fail while RavenDB starts. Once the container is healthy, try creating `Playerdata` again using RavenDB Studio. Because the prior Raft command may already have left a database record, **inspect the existing database list first**. If `Playerdata` exists and reports healthy, do not recreate or delete it; run `python3 docker/db_config.py check --start-fresh` to confirm it is empty. If it shows an error, read the newest service logs and database status before considering changes. **Never use `docker compose down -v` or remove the named volume.**
+
+---
+
 ## Fresh installation (selected: no old accounts or characters to keep)
 
 **Choose this section INSTEAD of the import/export migration sections below.** Your previous folders `.runtime/saves` and `.runtime/saves-login-test-dvuuty_v` remain untouched. You don't need to run or tunnel to the old embedded RavenDB on port 8090.
