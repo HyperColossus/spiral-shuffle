@@ -61,6 +61,57 @@ class DockerDBTests(TestCase):
             self.assertEqual(backups[0].read_text(), CONFIG_TEXT)
             self.assertEqual(backups[0].stat().st_mode & 0o777, 0o600)
 
+    def test_empty_database_allowed_only_with_fresh_flag(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        with mock.patch.object(db, "urlopen", return_value=response), \
+             mock.patch.object(db.json, "load", return_value={"CountOfDocuments": 0}):
+            self.assertEqual(db.check_destination(allow_empty=True), 0)
+            with self.assertRaisesRegex(RuntimeError, "Import accounts"):
+                db.check_destination()
+
+    def test_fresh_mode_refuses_existing_player_records(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        with mock.patch.object(db, "urlopen", return_value=response), \
+             mock.patch.object(db.json, "load", return_value={"CountOfDocuments": 1}):
+            with self.assertRaisesRegex(RuntimeError, "already contains documents"):
+                db.check_destination(allow_empty=True)
+
+    def test_fresh_switch_preserves_old_saves_and_ini_backup(self):
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            config = base / "Imlight.ini"
+            config.write_text(CONFIG_TEXT)
+            sentinel = base / "never-exists.pfx"
+            import sys
+            sys.path.insert(0, str(ROOT))
+            import linux_ctl
+            with mock.patch.object(db, "CONFIG", config), \
+                 mock.patch.object(db, "NO_CERT", sentinel), \
+                 mock.patch.object(db, "check_destination", return_value=0) as checked, \
+                 mock.patch.object(linux_ctl, "owned_process", return_value=None):
+                db.switch(start_fresh=True)
+            checked.assert_called_once_with(allow_empty=True)
+            self.assertIn("PlayerDatabaseUrl = http://127.0.0.1:18080", config.read_text())
+            backups = list(base.glob("Imlight.ini.before-docker.*"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_text(), CONFIG_TEXT)
+
+    def test_fresh_switch_refuses_weak_admin_password(self):
+        with TemporaryDirectory() as folder:
+            base = Path(folder)
+            config = base / "Imlight.ini"
+            config.write_text(CONFIG_TEXT.replace("unprinted-secret-value", "123"))
+            import sys
+            sys.path.insert(0, str(ROOT))
+            import linux_ctl
+            with mock.patch.object(db, "CONFIG", config), \
+                 mock.patch.object(linux_ctl, "owned_process", return_value=None):
+                with self.assertRaisesRegex(ValueError, "strong AdminAccountPassword"):
+                    db.switch(start_fresh=True)
+            self.assertEqual(len(list(base.glob("Imlight.ini.before-docker.*"))), 0)
+
     def test_compose_unsecured_mode_stays_host_loopback_only(self):
         compose = (ROOT / "docker/ravendb.compose.yml").read_text()
         # The 0.0.0.0 bind is INSIDE the container. The published host port
