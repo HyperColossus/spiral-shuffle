@@ -61,6 +61,15 @@ class DockerDBTests(TestCase):
             self.assertEqual(backups[0].read_text(), CONFIG_TEXT)
             self.assertEqual(backups[0].stat().st_mode & 0o777, 0o600)
 
+    def test_compose_unsecured_mode_stays_host_loopback_only(self):
+        compose = (ROOT / "docker/ravendb.compose.yml").read_text()
+        # The 0.0.0.0 bind is INSIDE the container. The published host port
+        # MUST remain loopback-only because RavenDB HTTP has no auth here.
+        self.assertIn('RAVEN_Security_UnsecuredAccessAllowed: "PublicNetwork"', compose)
+        self.assertIn('"127.0.0.1:18080:8080"', compose)
+        self.assertNotIn('"0.0.0.0:18080:8080"', compose)
+        self.assertNotIn('"18080:8080"', compose)
+
     def test_import_not_performed_by_script(self):
         source = (ROOT / "docker/db_config.py").read_text()
         self.assertNotIn("docker rm", source)
