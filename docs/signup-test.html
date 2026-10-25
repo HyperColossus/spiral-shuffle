@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#080b1b">
   <meta name="description" content="Spiral Shuffle — friends-only multiplayer randomizer server.">
-  <title>Spiral Shuffle — Signup Test</title>
+  <title>Spiral Shuffle — Game Access Test</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -201,9 +201,10 @@
     <section class="panel" aria-label="Spiral Shuffle account registration">
       <h1>Spiral Shuffle</h1>
 
-      <div id="server-address" class="ip pending" aria-label="Game server address">SIGNUP TEST</div>
+      <div id="server-address" class="ip pending" aria-label="Game server address">GAME ACCESS TEST</div>
 
-      <p class="message">Signup test: use a new test account and save the private access key after signup. Game connectivity is being tested separately.</p>
+      <p class="message">Enter your game username and password. New usernames create a game account automatically.</p>
+      <p class="message">The test service is being updated. The username/password form will reopen after the backend update.</p>
       <form id="signup-form" autocomplete="on">
         <label for="username" class="sr-only">Username</label>
         <input class="input" id="username" name="username" type="text"
@@ -215,32 +216,15 @@
 
         <label for="password" class="sr-only">Password</label>
         <input class="input" id="password" name="password" type="password"
-          placeholder="Password" autocomplete="new-password"
-          minlength="12" maxlength="32"
-          title="12–32 characters without spaces" required disabled>
+          placeholder="Password" autocomplete="current-password"
+          minlength="1" maxlength="32"
+          title="New accounts need 12–32 characters without spaces" required disabled>
 
         <div class="verification" id="verification"></div>
 
-        <button class="button" id="create-account" type="submit" disabled>Create Account</button>
+        <button class="button" id="create-account" type="submit" disabled>Continue</button>
         <p id="status" class="message sr-only" aria-live="polite">Account registration is not available yet.</p>
       </form>
-      <div id="saved-access" hidden>
-        <p class="message success">Save this private access key in your password manager. It lets you reconnect from a new network for 90 days. Never share it.</p>
-        <label for="new-access-key">Your private access key</label>
-        <input class="input" id="new-access-key" readonly autocomplete="off" spellcheck="false">
-      </div>
-      <details id="access-controls" hidden>
-        <summary>Already registered? Update game access</summary>
-        <p class="message">Use the network you will play from. Your private access key updates access for this network for 30 days.</p>
-        <form id="access-form">
-          <label for="access-key" class="sr-only">Private access key</label>
-          <input class="input" id="access-key" type="password" placeholder="Private access key"
-            autocomplete="off" minlength="43" maxlength="43" required disabled>
-          <div class="verification" id="access-verification"></div>
-          <button class="button" id="refresh-access" type="submit" disabled>Update Game Access</button>
-          <p id="access-status" class="message" aria-live="polite"></p>
-        </form>
-      </details>
     </section>
   </main>
 
@@ -251,8 +235,7 @@
     window.SPIRAL_SITE_CONFIG = {
       gameHost: "",
       gamePort: 12010,
-      registrationApi: "https://register.spiral.hypercoloss.us/register",
-      ipAccessEnabled: true,
+      registrationApi: "",
       turnstileSiteKey: "0x4AAAAAAFkwhmIGDO-3J5K9"
     };
   </script>
@@ -310,8 +293,8 @@
                 status.textContent = "Choose a lowercase username, 3–20 characters.";
                 return;
               }
-              if (!/^[!-~]{12,32}$/.test(password)) {
-                status.textContent = "Use a password of 12–32 characters without spaces.";
+              if (!/^[!-~]{1,32}$/.test(password)) {
+                status.textContent = "Enter your game password. New accounts need 12–32 characters without spaces.";
                 return;
               }
               const token = window.turnstile.getResponse(widget);
@@ -320,7 +303,7 @@
                 return;
               }
               button.disabled = true;
-              button.textContent = "Creating…";
+              button.textContent = "Connecting…";
               try {
                 const response = await fetch(api, {
                   method: "POST",
@@ -339,74 +322,17 @@
                   status.classList.add("success");
                   status.textContent = typeof result.message === "string"
                     ? result.message : "Account created. You can now log in to the game.";
-                  if (typeof result.accessKey === "string" && /^[A-Za-z0-9_-]{43}$/.test(result.accessKey)) {
-                    document.getElementById("new-access-key").value = result.accessKey;
-                    document.getElementById("saved-access").hidden = false;
-                  }
+
                 }
               } catch (_) {
                 status.textContent = "Cannot reach the registration service right now.";
               } finally {
                 window.turnstile.reset(widget);
-                button.textContent = "Create Account";
+                button.textContent = "Continue";
                 button.disabled = false;
               }
             });
-            if (config.ipAccessEnabled === true) {
-              const controls = document.getElementById("access-controls");
-              const accessForm = document.getElementById("access-form");
-              const accessKey = document.getElementById("access-key");
-              const accessButton = document.getElementById("refresh-access");
-              const accessStatus = document.getElementById("access-status");
-              const refreshUrl = new URL("/access/refresh", api).href;
-              let accessWidget;
-              controls.hidden = false;
-              // Render only after opening: Turnstile needs a visible container.
-              controls.addEventListener("toggle", () => {
-                if (!controls.open || accessWidget !== undefined) return;
-                try {
-                  accessWidget = window.turnstile.render(document.getElementById("access-verification"), {
-                    sitekey: siteKey, action: "register", theme: "dark", appearance: "interaction-only"
-                  });
-                  accessKey.disabled = false;
-                  accessButton.disabled = false;
-                } catch (_) {
-                  accessStatus.textContent = "Security verification is unavailable. Reload and try again.";
-                }
-              });
-              accessForm.addEventListener("submit", async event => {
-                event.preventDefault();
-                const key = accessKey.value.trim();
-                if (!/^[A-Za-z0-9_-]{43}$/.test(key)) {
-                  accessStatus.textContent = "Enter the private access key saved during signup.";
-                  return;
-                }
-                const proof = window.turnstile.getResponse(accessWidget);
-                if (!proof) {
-                  accessStatus.textContent = "Complete the security verification.";
-                  return;
-                }
-                accessButton.disabled = true;
-                try {
-                  const response = await fetch(refreshUrl, {
-                    method: "POST", mode: "cors", credentials: "omit", cache: "no-store",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ accessKey: key, turnstileToken: proof })
-                  });
-                  const result = await response.json().catch(() => ({}));
-                  accessStatus.textContent = response.ok
-                    ? (result.message || "Game access updated.")
-                    : (result.error || "Cannot update access right now.");
-                  accessStatus.classList.toggle("success", response.ok);
-                  if (response.ok) accessForm.reset();
-                } catch (_) {
-                  accessStatus.textContent = "Cannot reach the access service right now.";
-                } finally {
-                  window.turnstile.reset(accessWidget);
-                  accessButton.disabled = false;
-                }
-              });
-            }
+
           } catch (_) {
             status.textContent = "Registration isn't available yet.";
           }
