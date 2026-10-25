@@ -1,0 +1,11 @@
+[Unit]
+Description=Deploy tested Spiral Shuffle main updates
+After=spiral-game.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 @ROOT@/auto_deploy.py
+TimeoutStartSec=900
+UMask=0077
+NoNewPrivileges=true

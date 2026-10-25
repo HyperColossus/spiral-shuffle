@@ -1,0 +1,19 @@
+[Unit]
+Description=Spiral Shuffle game and patch supervision
+Wants=spiral-portal.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 @ROOT@/service_runtime.py
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=240
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

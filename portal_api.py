@@ -233,6 +233,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self.json_reply(200, "Registration API is listening.", True)
+        elif self.path == "/deployment":
+            # Public operational metadata only. Never expose private logs,
+            # paths, environment, account data or arbitrary state fields.
+            path = ROOT / ".runtime/deploy/state.json"
+            try:
+                if path.stat().st_size > 8192:
+                    raise ValueError("Invalid deployment state")
+                state = json.loads(path.read_text())
+                revision = state.get("revision", "")
+                if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+                    raise ValueError("Invalid revision")
+                allowed = {"current", "waiting_for_main", "waiting_for_checks", "deploying", "rolled_back",
+                           "recovery_failed", "check_failed", "blocked_scope", "blocked_failed_revision", "blocked_failed_checks", "blocked_local_changes"}
+                public = {"revision":revision, "status":state.get("status") if state.get("status") in allowed else "unavailable"}
+                if type(state.get("updated_at")) is int:
+                    public["updated_at"] = state["updated_at"]
+                self.json_reply(200, "Deployment status.", True, deployment=public)
+            except (OSError, ValueError, TypeError, AttributeError):
+                self.json_reply(503, "Deployment status unavailable.")
         else:
             self.json_reply(404, "Not found.")
 
