@@ -1,4 +1,4 @@
-"""Serve only the game patch directories on localhost."""
+"""Serve only the game patch directories on the configured interface."""
 import argparse
 import mimetypes
 import re
@@ -72,10 +72,11 @@ class PatchHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=12379)
     args = parser.parse_args()
     PatchHandler.roots = (PATCH, base_version().parent)
-    ThreadingHTTPServer(("127.0.0.1", args.port), PatchHandler).serve_forever()
+    ThreadingHTTPServer((args.host, args.port), PatchHandler).serve_forever()
 
 
 if __name__ == "__main__":
