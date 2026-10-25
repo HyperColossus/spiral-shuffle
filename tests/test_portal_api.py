@@ -15,6 +15,25 @@ import portal_api as api
 
 
 class RegistrationApiTests(unittest.TestCase):
+    def test_bridge_client_accepts_created_and_verified_accounts(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for status in (200, 201):
+            response = mock.MagicMock()
+            response.__enter__.return_value.status = status
+            with mock.patch.object(api, "urlopen", return_value=response) as send:
+                result, _ = api.create_game_account(settings, "player_one", "ExamplePassword123!", "8.8.8.8")
+            self.assertEqual(result, status)
+            request = send.call_args.args[0]
+            self.assertEqual(request.full_url, "http://127.0.0.1:12772/enter")
+            self.assertEqual(json.loads(request.data), {"Username":"player_one", "Password":"ExamplePassword123!", "ClientIp":"8.8.8.8"})
+
+    def test_bridge_client_wrong_password_and_unavailable_versions_fail_closed(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for bridge_status, expected in ((403, 403), (404, 503), (500, 503)):
+            with mock.patch.object(api, "urlopen", side_effect=HTTPError(api.BRIDGE_URL, bridge_status, "Error", {}, None)):
+                status, _ = api.create_game_account(settings, "player_one", "ExamplePassword123!", "8.8.8.8")
+                self.assertEqual(status, expected)
+
     def test_username_and_password_policy(self):
         self.assertTrue(api.USER_RULE.fullmatch("player_one"))
         self.assertFalse(api.USER_RULE.fullmatch("Admin"))
