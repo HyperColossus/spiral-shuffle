@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b1b">
+  <meta name="description" content="Spiral Shuffle — friends-only multiplayer randomizer server.">
+  <title>Spiral Shuffle — Signup Test</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --white: #f7f5ff;
+      --soft: #b3b8ce;
+      --glow: #b9b4ff;
+      --accent: #c6b6ff;
+      --mint: #a6f7e3;
+      --border: rgba(235, 234, 255, .17);
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --body: "DM Sans", system-ui, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--white);
+      background: #0b1026;
+      font-family: var(--body);
+      -webkit-font-smoothing: antialiased;
+    }
+    .scene {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      isolation: isolate;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 85% 75% at 4% 7%, rgba(63, 50, 131, .92), transparent 75%),
+        radial-gradient(ellipse 90% 72% at 98% 74%, rgba(9, 103, 121, .65), transparent 80%),
+        radial-gradient(ellipse 60% 55% at 60% 40%, rgba(53, 32, 107, .65), transparent 83%),
+        linear-gradient(133deg, #12102f 0%, #101737 45%, #031c2d 100%);
+    }
+    .scene::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background: radial-gradient(ellipse at 50% 40%, rgba(3, 7, 24, .12) 8%, rgba(2, 5, 19, .43) 100%);
+    }
+    #liquid {
+      width: 100%;
+      height: 100%;
+      display: block;
+      mix-blend-mode: screen;
+      filter: blur(21px) saturate(165%);
+      opacity: .91;
+      transform: scale(1.075);
+    }
+    .grain {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: .12;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+    }
+    .center {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: 38px 20px;
+    }
+    .panel {
+      width: min(100%, 500px);
+      padding: clamp(28px, 5vw, 53px);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+      background: linear-gradient(155deg, rgba(13, 16, 38, .63), rgba(6, 14, 30, .79));
+      box-shadow: 0 33px 100px rgba(2, 5, 17, .37), inset 0 1px 0 rgba(255, 255, 255, .1);
+      -webkit-backdrop-filter: blur(32px) saturate(125%);
+      backdrop-filter: blur(32px) saturate(125%);
+      text-align: center;
+    }
+    h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(36px, 7vw, 51px);
+      font-weight: 700;
+      letter-spacing: -.065em;
+      line-height: 1.05;
+      text-wrap: balance;
+    }
+    .ip {
+      display: block;
+      margin: 26px 0 35px;
+      color: var(--mint);
+      font-family: var(--display);
+      font-size: clamp(26px, 5vw, 37px);
+      font-weight: 600;
+      letter-spacing: -.045em;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      text-shadow: 0 0 48px rgba(142, 250, 227, .25);
+      user-select: all;
+    }
+    .ip.pending {
+      color: #cecae8;
+      font-size: clamp(22px, 4.3vw, 31px);
+      letter-spacing: -.04em;
+    }
+    form { display: grid; gap: 14px; }
+    .input {
+      width: 100%;
+      min-height: 56px;
+      padding: 0 19px;
+      border: 1px solid rgba(240, 237, 255, .2);
+      border-radius: 15px;
+      color: var(--white);
+      background: rgba(11, 16, 36, .51);
+      font-family: var(--body);
+      font-size: 16px;
+      outline: none;
+      transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .input::placeholder { color: #b5bad0; opacity: .94; }
+    .input:focus {
+      background: rgba(16, 21, 45, .82);
+      border-color: rgba(182, 248, 226, .82);
+      box-shadow: 0 0 0 3px rgba(166, 247, 227, .11);
+    }
+    .input:disabled { opacity: .64; cursor: not-allowed; }
+    .button {
+      display: block;
+      width: 100%;
+      min-height: 56px;
+      margin-top: 2px;
+      padding: 13px 18px;
+      border: 0;
+      border-radius: 15px;
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -.015em;
+      color: #0e1428;
+      background: linear-gradient(115deg, #a8f3dd 0%, #b1dce9 44%, #c5b5ff 100%);
+      box-shadow: 0 9px 30px rgba(103, 171, 190, .19);
+      transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+      cursor: pointer;
+    }
+    .button:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 13px 39px rgba(141, 184, 233, .28);
+    }
+    .button:not(:disabled):active { transform: translateY(0); }
+    .button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+    .verification { display: flex; justify-content: center; min-height: 0; }
+    .message {
+      margin: 0;
+      color: #ffd9e0;
+      font-size: 13px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .message:empty { display: none; }
+    .message.success { color: #b1ffdf; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+    :focus-visible { outline: 2px solid #c6b6ff; outline-offset: 3px; }
+    @media (max-width: 480px) {
+      .center { padding: 20px 14px; }
+      .panel { border-radius: 24px; padding: 38px 22px; }
+      h1 { font-size: clamp(35px, 11vw, 47px); }
+      .ip { margin: 25px 0 30px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0s !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true">
+    <canvas id="liquid"></canvas>
+    <div class="grain"></div>
+  </div>
+
+  <main class="center">
+    <section class="panel" aria-label="Spiral Shuffle account registration">
+      <h1>Spiral Shuffle</h1>
+
+      <div id="server-address" class="ip pending" aria-label="Game server address">SIGNUP TEST</div>
+
+      <p class="message">Signup test: use a new test account and save the private access key after signup. Game connectivity is being tested separately.</p>
+      <form id="signup-form" autocomplete="on">
+        <label for="username" class="sr-only">Username</label>
+        <input class="input" id="username" name="username" type="text"
+          placeholder="Username" autocomplete="username" autocapitalize="none"
+          autocorrect="off" spellcheck="false"
+          minlength="3" maxlength="20" pattern="[a-z][a-z0-9_]{2,19}"
+          title="3–20 lowercase letters, digits or underscores, starting with a letter"
+          required disabled>
+
+        <label for="password" class="sr-only">Password</label>
+        <input class="input" id="password" name="password" type="password"
+          placeholder="Password" autocomplete="new-password"
+          minlength="12" maxlength="32"
+          title="12–32 characters without spaces" required disabled>
+
+        <div class="verification" id="verification"></div>
+
+        <button class="button" id="create-account" type="submit" disabled>Create Account</button>
+        <p id="status" class="message sr-only" aria-live="polite">Account registration is not available yet.</p>
+      </form>
+      <div id="saved-access" hidden>
+        <p class="message success">Save this private access key in your password manager. It lets you reconnect from a new network for 90 days. Never share it.</p>
+        <label for="new-access-key">Your private access key</label>
+        <input class="input" id="new-access-key" readonly autocomplete="off" spellcheck="false">
+      </div>
+      <details id="access-controls" hidden>
+        <summary>Already registered? Update game access</summary>
+        <p class="message">Use the network you will play from. Your private access key updates access for this network for 30 days.</p>
+        <form id="access-form">
+          <label for="access-key" class="sr-only">Private access key</label>
+          <input class="input" id="access-key" type="password" placeholder="Private access key"
+            autocomplete="off" minlength="43" maxlength="43" required disabled>
+          <div class="verification" id="access-verification"></div>
+          <button class="button" id="refresh-access" type="submit" disabled>Update Game Access</button>
+          <p id="access-status" class="message" aria-live="polite"></p>
+        </form>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    // PUBLIC website settings only. Keep API secrets and passwords off GitHub.
+    // gameHost must be the GAME SERVER'S PUBLIC IP or hostname, not the Pages subdomain.
+    // Leave keys blank until an independently secured HTTPS registration API exists.
+    window.SPIRAL_SITE_CONFIG = {
+      gameHost: "",
+      gamePort: 12010,
+      registrationApi: "https://register.spiral.hypercoloss.us/register",
+      ipAccessEnabled: true,
+      turnstileSiteKey: "0x4AAAAAAFkwhmIGDO-3J5K9"
+    };
+  </script>
+
+  <script>
+    (() => {
+      "use strict";
+      const config = window.SPIRAL_SITE_CONFIG || {};
+      const address = document.getElementById("server-address");
+      const host = typeof config.gameHost === "string" ? config.gameHost.trim() : "";
+      const port = Number.isInteger(config.gamePort) && config.gamePort > 0 && config.gamePort < 65536
+        ? config.gamePort : 12010;
+      if (/^[a-z0-9.-]+$/i.test(host) && host.length < 254) {
+        address.textContent = host + ":" + port;
+        address.classList.remove("pending");
+      }
+
+      const form = document.getElementById("signup-form");
+      const fields = [document.getElementById("username"), document.getElementById("password")];
+      const button = document.getElementById("create-account");
+      const status = document.getElementById("status");
+      const verification = document.getElementById("verification");
+      const api = typeof config.registrationApi === "string" ? config.registrationApi.trim() : "";
+      const siteKey = typeof config.turnstileSiteKey === "string" ? config.turnstileSiteKey.trim() : "";
+      let apiValid = false;
+      try {
+        const url = new URL(api);
+        apiValid = url.protocol === "https:" && !url.username && !url.password && !url.hash;
+      } catch (_) {}
+      // Keep the form locked until BOTH the HTTPS API and bot verification are configured.
+      if (apiValid && /^[a-zA-Z0-9_-]{8,128}$/.test(siteKey)) {
+        const script = document.createElement("script");
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          try {
+            if (!window.turnstile) return;
+            const widget = window.turnstile.render(verification, {
+              sitekey: siteKey,
+              action: "register",
+              theme: "dark",
+              appearance: "interaction-only"
+            });
+            fields.forEach(input => { input.disabled = false; });
+            button.disabled = false;
+            status.textContent = "";
+            status.classList.remove("sr-only");
+            form.addEventListener("submit", async event => {
+              event.preventDefault();
+              const username = fields[0].value.trim();
+              const password = fields[1].value;
+              status.classList.remove("success");
+              if (!/^[a-z][a-z0-9_]{2,19}$/.test(username)) {
+                status.textContent = "Choose a lowercase username, 3–20 characters.";
+                return;
+              }
+              if (!/^[!-~]{12,32}$/.test(password)) {
+                status.textContent = "Use a password of 12–32 characters without spaces.";
+                return;
+              }
+              const token = window.turnstile.getResponse(widget);
+              if (!token) {
+                status.textContent = "Complete the security verification.";
+                return;
+              }
+              button.disabled = true;
+              button.textContent = "Creating…";
+              try {
+                const response = await fetch(api, {
+                  method: "POST",
+                  mode: "cors",
+                  credentials: "omit",
+                  cache: "no-store",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ username, password, turnstileToken: token })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                  status.textContent = typeof result.error === "string"
+                    ? result.error : "Registration unavailable. Try again later.";
+                } else {
+                  form.reset();
+                  status.classList.add("success");
+                  status.textContent = typeof result.message === "string"
+                    ? result.message : "Account created. You can now log in to the game.";
+                  if (typeof result.accessKey === "string" && /^[A-Za-z0-9_-]{43}$/.test(result.accessKey)) {
+                    document.getElementById("new-access-key").value = result.accessKey;
+                    document.getElementById("saved-access").hidden = false;
+                  }
+                }
+              } catch (_) {
+                status.textContent = "Cannot reach the registration service right now.";
+              } finally {
+                window.turnstile.reset(widget);
+                button.textContent = "Create Account";
+                button.disabled = false;
+              }
+            });
+            if (config.ipAccessEnabled === true) {
+              const controls = document.getElementById("access-controls");
+              const accessForm = document.getElementById("access-form");
+              const accessKey = document.getElementById("access-key");
+              const accessButton = document.getElementById("refresh-access");
+              const accessStatus = document.getElementById("access-status");
+              const refreshUrl = new URL("/access/refresh", api).href;
+              let accessWidget;
+              controls.hidden = false;
+              // Render only after opening: Turnstile needs a visible container.
+              controls.addEventListener("toggle", () => {
+                if (!controls.open || accessWidget !== undefined) return;
+                try {
+                  accessWidget = window.turnstile.render(document.getElementById("access-verification"), {
+                    sitekey: siteKey, action: "register", theme: "dark", appearance: "interaction-only"
+                  });
+                  accessKey.disabled = false;
+                  accessButton.disabled = false;
+                } catch (_) {
+                  accessStatus.textContent = "Security verification is unavailable. Reload and try again.";
+                }
+              });
+              accessForm.addEventListener("submit", async event => {
+                event.preventDefault();
+                const key = accessKey.value.trim();
+                if (!/^[A-Za-z0-9_-]{43}$/.test(key)) {
+                  accessStatus.textContent = "Enter the private access key saved during signup.";
+                  return;
+                }
+                const proof = window.turnstile.getResponse(accessWidget);
+                if (!proof) {
+                  accessStatus.textContent = "Complete the security verification.";
+                  return;
+                }
+                accessButton.disabled = true;
+                try {
+                  const response = await fetch(refreshUrl, {
+                    method: "POST", mode: "cors", credentials: "omit", cache: "no-store",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ accessKey: key, turnstileToken: proof })
+                  });
+                  const result = await response.json().catch(() => ({}));
+                  accessStatus.textContent = response.ok
+                    ? (result.message || "Game access updated.")
+                    : (result.error || "Cannot update access right now.");
+                  accessStatus.classList.toggle("success", response.ok);
+                  if (response.ok) accessForm.reset();
+                } catch (_) {
+                  accessStatus.textContent = "Cannot reach the access service right now.";
+                } finally {
+                  window.turnstile.reset(accessWidget);
+                  accessButton.disabled = false;
+                }
+              });
+            }
+          } catch (_) {
+            status.textContent = "Registration isn't available yet.";
+          }
+        };
+        script.onerror = () => { status.textContent = "Registration isn't available yet."; };
+        document.head.appendChild(script);
+      }
+
+      // Smooth, procedurally randomized viscous waves — no external assets.
+      const canvas = document.getElementById("liquid");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return;
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const bands = Array.from({ length: 4 }, (_, i) => ({
+        phase: Math.random() * Math.PI * 2,
+        drift: .2 + Math.random() * .22,
+        curls: [
+          { frequency: 1.6 + Math.random(), phase: Math.random() * 6.28, speed: .28 + Math.random() * .12 },
+          { frequency: 4 + Math.random() * 2.8, phase: Math.random() * 6.28, speed: -.17 - Math.random() * .14 },
+          { frequency: 7 + Math.random() * 2.2, phase: Math.random() * 6.28, speed: .09 + Math.random() * .08 }
+        ],
+        base: .48 + i * .105,
+        alpha: .38 - i * .055,
+        colors: [
+          ["#9c80ff", "#5f47c8"],
+          ["#a7b8ff", "#7562e8"],
+          ["#63e6d1", "#2f89ad"],
+          ["#5fdac9", "#165b9c"]
+        ][i]
+      }));
+      const blobs = Array.from({ length: 9 }, (_, i) => ({
+        x: .05 + Math.random() * .9,
+        y: .42 + Math.random() * .5,
+        radius: .09 + Math.random() * .12,
+        shift: Math.random() * 6.28,
+        speed: .08 + Math.random() * .14,
+        color: i % 3 === 0 ? "#bd9cff" : i % 3 === 1 ? "#4ce9d6" : "#6a8fff"
+      }));
+      let width = 0, height = 0, lastFrame = 0, frameId = 0;
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const scale = Math.min(devicePixelRatio || 1, 1.5);
+        canvas.width = Math.max(1, Math.round(rect.width * scale));
+        canvas.height = Math.max(1, Math.round(rect.height * scale));
+        width = canvas.width;
+        height = canvas.height;
+        paint(reduced ? 8 : performance.now() / 1000);
+      }
+      function waveValue(band, x, time) {
+        let value = Math.sin(x * 2.1 + time * band.drift + band.phase) * .60;
+        for (let j = 0; j < band.curls.length; j++) {
+          const curl = band.curls[j];
+          value += Math.sin(x * curl.frequency + time * curl.speed + curl.phase) * (.40 / (j + 1));
+        }
+        return value;
+      }
+      function paint(time) {
+        ctx.clearRect(0, 0, width, height);
+        const span = Math.min(width, height);
+        blobs.forEach(blob => {
+          const x = (blob.x + Math.sin(time * blob.speed + blob.shift) * .035) * width;
+          const y = (blob.y + Math.cos(time * blob.speed * .8 + blob.shift) * .07) * height;
+          const r = span * blob.radius;
+          const halo = ctx.createRadialGradient(x, y, 2, x, y, r);
+          halo.addColorStop(0, blob.color + "66");
+          halo.addColorStop(1, blob.color + "00");
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        bands.forEach((band, i) => {
+          const level = band.base * height;
+          const amp = height * (.045 + i * .009);
+          ctx.beginPath();
+          for (let x = 0; x <= width + 15; x += 12) {
+            const xx = Math.min(x, width);
+            const yy = level + waveValue(band, xx / width * Math.PI * 2, time) * amp;
+            if (x === 0) ctx.moveTo(xx, yy);
+            else ctx.lineTo(xx, yy);
+          }
+          ctx.lineTo(width, height);
+          ctx.lineTo(0, height);
+          ctx.closePath();
+          const fill = ctx.createLinearGradient(0, level - amp * 2, width * .3, height);
+          fill.addColorStop(0, band.colors[0]);
+          fill.addColorStop(.6, band.colors[1]);
+          fill.addColorStop(1, "#051b41");
+          ctx.globalAlpha = band.alpha;
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = band.colors[0] + "99";
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+      }
+      function animate(now) {
+        frameId = requestAnimationFrame(animate);
+        if (document.hidden || now - lastFrame < 33) return;
+        lastFrame = now;
+        paint(now / 1000);
+      }
+      window.addEventListener("resize", resize, { passive: true });
+      resize();
+      if (!reduced) frameId = requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
