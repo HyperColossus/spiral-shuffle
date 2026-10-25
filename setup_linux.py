@@ -108,7 +108,7 @@ def configure_server(revive: Path, game_ip: str) -> None:
         "LoginServerPort": "12010", "GameServerPort": "12343", "GameServerIP": game_ip,
         "GameServerCount": "6", "MaxGameServersAllowed": "6",
         "RealmNames": "Shuffle,Chaos,Nightmare,ShuffleCreatures,ChaosCreatures,NightmareCreatures",
-        "PatchServerPort": "12510", "PatchServerInternalUrl": "http://127.0.0.1:12379",
+        "PatchServerPort": "12510", "PatchServerInternalUrl": f"http://{game_ip}:12379",
         "EmbeddedDatabasePort": "8090", "EmbeddedDatabaseDataDirectory": str((RUNTIME / "saves").resolve()),
         "EmbeddedDatabaseUseFull": "false", "PlayerDatabaseUrl": "", "PlayerDatabaseCertificatePath": "",
         "SpiralDBLocalPath": str((revive / "Imlight/spiraldb-cache").resolve()),
