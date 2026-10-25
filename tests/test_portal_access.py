@@ -45,7 +45,7 @@ class GrantTests(unittest.TestCase):
         self.assertFalse(self.store.refresh(None, "9.9.9.9", now=2000))
 
     def test_nonpublic_and_nonipv4_addresses_never_create_grants(self):
-        for value in ("127.0.0.1", "192.168.1.1", "100.96.206.48", "::1", "2606:4700:4700::1111", "0.0.0.0/0", "8.8.8.8; reboot"):
+        for value in ("127.0.0.1", "192.168.1.1", "100.96.206.48", "224.0.0.1", "255.255.255.255", "::1", "2606:4700:4700::1111", "0.0.0.0/0", "8.8.8.8; reboot"):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 public_ipv4(value)
 

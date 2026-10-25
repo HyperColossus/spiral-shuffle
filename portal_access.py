@@ -17,7 +17,7 @@ KEY_RULE = re.compile(r"^[A-Za-z0-9_-]{43}$", re.ASCII)
 
 def public_ipv4(value: str) -> str:
     address = ipaddress.ip_address(value)
-    if address.version != 4 or not address.is_global:
+    if address.version != 4 or not address.is_global or address.is_multicast:
         raise ValueError("A public IPv4 connection is required for game access.")
     return str(address)
 

@@ -25,7 +25,7 @@ LEASE_SECONDS = 30 * 86400
 
 def public_ipv4(value):
     ip = ipaddress.ip_address(value)
-    if ip.version != 4 or not ip.is_global:
+    if ip.version != 4 or not ip.is_global or ip.is_multicast:
         raise ValueError("Invalid public IPv4 grant")
     return str(ip)
 
