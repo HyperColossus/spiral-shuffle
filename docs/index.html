@@ -92,6 +92,14 @@
     }
     [hidden] { display: none !important; }
     .download-panel { width: min(calc(100% - 32px), 840px); max-width: none; max-height: calc(100dvh - 48px); padding: 28px 4px 4px; overflow: auto; border: 0; color: var(--white); background: transparent; text-align: left; }
+    .download-panel { scrollbar-width: none; -ms-overflow-style: none; }
+    .download-panel::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    .download-panel[open] { animation: download-enter .24s ease-out both; }
+    @keyframes download-enter {
+      from { opacity: 0; transform: translateY(12px) scale(.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) { .download-panel[open] { animation: none; } }
     .download-panel::backdrop { background: rgba(3, 7, 24, .12); }
     .download-close { position: absolute; top: 0; right: 4px; padding: 0 7px; border: 0; background: transparent; color: var(--white); font: 26px/1 var(--body); cursor: pointer; }
     .download-card { backdrop-filter: blur(32px) saturate(125%); -webkit-backdrop-filter: blur(32px) saturate(125%); box-shadow: 0 25px 75px rgba(2, 5, 17, .25); }
@@ -105,6 +113,7 @@
     .download-card p { margin: 0 0 28px; color: var(--soft); font-size: 15px; line-height: 1.6; }
     .download-card .button { display: flex; justify-content: center; align-items: center; margin-top: auto; text-decoration: none; }
     .manual-guide { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+    .manual-content { overflow: hidden; }
     .manual-guide summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; }
     .manual-guide summary::-webkit-details-marker { display: none; }
     .manual-guide summary::after { content: "+"; font-size: 20px; line-height: 1; }
@@ -312,6 +321,7 @@
           <span class="download-size">Windows · 2.32 GB</span>
           <details class="manual-guide">
             <summary>Manual Install</summary>
+            <div class="manual-content">
             <ol>
               <li>Download the Full Client ZIP and choose <strong>Extract All</strong> in Windows.</li>
               <li>Move the extracted <code>Client</code> folder to where you want the game installed. Allow at least 15 GB free for downloading and extraction.</li>
@@ -328,6 +338,7 @@
               <li>Save both files, then open <code>Wizard101.exe</code> in your client folder. You can create a desktop shortcut to it.</li>
             </ol>
             <p class="manual-note">Sign in on this website first to authorize your connection. Use the same account in the launcher. Install.cmd is not needed for manual setup.</p>
+            </div>
           </details>
         </article>
         <article class="download-card">
@@ -337,6 +348,7 @@
           <span class="download-size">Windows · 3.4 KB</span>
           <details class="manual-guide">
             <summary>Manual Patch</summary>
+            <div class="manual-content">
             <ol>
               <li>Close the game and launcher. Open your existing Spiral Shuffle folder, not your official game installation.</li>
               <li>Back up <code>PatchClient/BankA/PatchConfig.xml</code> and <code>PatchClient/BankB/PatchConfig.xml</code>.</li>
@@ -353,6 +365,7 @@
               <li>Save both files, then launch <code>Wizard101.exe</code> from your Spiral Shuffle folder. The launcher downloads game updates.</li>
             </ol>
             <p class="manual-note">Sign in on this website first to authorize your connection. Manual patching only changes connection settings; no patch ZIP or Install.cmd is needed.</p>
+            </div>
           </details>
         </article>
       </div>
@@ -391,6 +404,38 @@
         accountPanel.hidden = false;
         if (downloadTrigger.focus) downloadTrigger.focus();
       });
+      for (const guide of document.querySelectorAll?.(".manual-guide") || []) {
+        const summary = guide.querySelector("summary");
+        const content = guide.querySelector(".manual-content");
+        let expanded = guide.open;
+        let motion = null;
+        summary.setAttribute("aria-expanded", String(expanded));
+        summary.addEventListener("click", event => {
+          event.preventDefault();
+          expanded = !expanded;
+          summary.setAttribute("aria-expanded", String(expanded));
+          const from = guide.open ? content.getBoundingClientRect().height : 0;
+          if (motion) motion.cancel();
+          guide.open = true;
+          const to = expanded ? content.scrollHeight : 0;
+          if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+            guide.open = expanded;
+            content.style.height = "";
+            return;
+          }
+          content.style.height = from + "px";
+          motion = content.animate(
+            [{ height: from + "px" }, { height: to + "px" }],
+            { duration: 300, easing: "cubic-bezier(.22, 1, .36, 1)", fill: "both" }
+          );
+          motion.onfinish = () => {
+            guide.open = expanded;
+            content.style.height = "";
+            motion.cancel();
+            motion = null;
+          };
+        });
+      }
       // Preserve previously shared download links without navigating on clicks.
       if (window.location?.hash === "#downloads") openDownloads();
       const config = window.SPIRAL_SITE_CONFIG || {};
