@@ -43,6 +43,8 @@ def init():
             out.write(
                 "# Load via: set -a; source .runtime/portal/portal.env; set +a\n"
                 "SPIRAL_PORTAL_PUBLIC=0\n"
+                "SPIRAL_IP_ACCESS=0\n"
+                "SPIRAL_LOCAL_SIGNUP_PEERS=\n"
                 "SPIRAL_ALLOWED_ORIGIN=https://spiral.hypercoloss.us\n"
                 "SPIRAL_TURNSTILE_SECRET=\n"
                 "SPIRAL_GAME_HOST=\n"

@@ -19,19 +19,74 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
+from portal_access import AccessStore, public_ipv4
+
 ROOT = Path(__file__).resolve().parent
 PRIVATE = ROOT / ".runtime" / "portal"
-BRIDGE_URL = "http://127.0.0.1:12772/register"
+BRIDGE_URL = "http://127.0.0.1:12772/enter"
 LISTEN_ADDRESS = ("127.0.0.1", 12771)
 USER_RULE = re.compile(r"^[a-z][a-z0-9_]{2,19}$", re.ASCII)
 PASS_RULE = re.compile(r"^[!-~]{12,32}$", re.ASCII)
+LOGIN_PASS_RULE = re.compile(r"^[!-~]{1,32}$", re.ASCII)
 RESERVED = frozenset(("admin", "administrator", "moderator", "support",
                       "system", "staff", "gamemaster"))
+
+
+BRIDGE_REJECTIONS = {
+    "username_format": (400, "Username must be 3–20 characters, start with a letter, and contain only letters, numbers or underscores."),
+    "username_reserved": (400, "That username is reserved for server staff. Choose a different username."),
+    "password_format": (400, "Passwords can contain at most 32 printable ASCII characters, with no spaces or other whitespace."),
+    "new_password_requirements": (400, "This username is new. Choose a password with 12–32 characters, without spaces. Existing accounts should use their current game password."),
+    "wrong_password": (403, "That username already exists, but the password is incorrect. Passwords are case-sensitive; check Caps Lock. To create a new account, choose a different username."),
+    "account_locked": (403, "Your password is correct, but this account is locked. Contact the server owner to restore access."),
+    "account_banned": (403, "Your password is correct, but this account is banned. Contact the server owner if you believe this is a mistake."),
+    "network_blocked": (403, "This network is blocked by the game server. Contact the server owner for help."),
+    "username_taken": (409, "That username already exists. Use its current password, or choose a different username for a new account."),
+}
+
+
+def credential_error(username: str, password: str) -> str | None:
+    if not username:
+        return "Enter a username."
+    if not 3 <= len(username) <= 20:
+        return "Username must be between 3 and 20 characters."
+    if not re.match(r"^[a-z]", username, re.ASCII):
+        return "Username must start with a letter."
+    if not USER_RULE.fullmatch(username):
+        return "Username can contain only letters, numbers and underscores."
+    if username in RESERVED:
+        return BRIDGE_REJECTIONS["username_reserved"][1]
+    if not password:
+        return "Enter your password."
+    if len(password) > 32:
+        return "Password cannot be longer than 32 characters."
+    if not LOGIN_PASS_RULE.fullmatch(password):
+        return "Password cannot contain spaces, whitespace or non-ASCII characters."
+    return None
+
+
+def local_signup_peers(value: str) -> frozenset[str]:
+    """Explicit private connection peers only; never a public-IP substitution."""
+    private_ranges = tuple(map(ipaddress.ip_network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
+    peers = set()
+    for item in value.split(","):
+        if not item.strip():
+            continue
+        address = ipaddress.ip_address(item.strip())
+        if address.version != 4 or not any(address in network for network in private_ranges):
+            raise ValueError("SPIRAL_LOCAL_SIGNUP_PEERS requires exact private LAN IPv4 addresses.")
+        peers.add(str(address))
+    return frozenset(peers)
 
 
 class Settings:
     def __init__(self):
         self.public = os.getenv("SPIRAL_PORTAL_PUBLIC", "0") == "1"
+        self.access_enabled = os.getenv("SPIRAL_IP_ACCESS", "0") == "1"
+        self.local_signup_peers = local_signup_peers(os.getenv("SPIRAL_LOCAL_SIGNUP_PEERS", ""))
+        if self.access_enabled and not self.public:
+            raise ValueError("IP access requires public mode and a trusted HTTPS proxy.")
+        self.access_store = AccessStore(PRIVATE) if self.access_enabled else None
         self.origin = os.getenv("SPIRAL_ALLOWED_ORIGIN", "https://spiral.hypercoloss.us").rstrip("/")
         url = urlsplit(self.origin)
         if (url.scheme not in ("https", "http") or not url.hostname or
@@ -92,16 +147,18 @@ def check_rate_limit(ip: str, salt: str, now: int | None = None) -> bool:
         connection.close()
 
 
-def verify_turnstile(settings: Settings, token: str, ip: str) -> bool:
+def verify_turnstile(settings: Settings, token: str, ip: str | None) -> bool:
     if not settings.public:
         return True
     if not token or len(token) > 2048:
         return False
-    payload = urlencode({
+    fields = {
         "secret": settings.turnstile_secret,
         "response": token,
-        "remoteip": ip,
-    }).encode("utf-8")
+    }
+    if ip is not None:
+        fields["remoteip"] = ip
+    payload = urlencode(fields).encode("utf-8")
     request = Request(
         "https://challenges.cloudflare.com/turnstile/v0/siteverify",
         data=payload, method="POST",
@@ -116,8 +173,9 @@ def verify_turnstile(settings: Settings, token: str, ip: str) -> bool:
         return False
 
 
-def create_game_account(settings: Settings, username: str, password: str) -> tuple[int, str]:
-    body = json.dumps({"Username": username, "Password": password}).encode("utf-8")
+def create_game_account(settings: Settings, username: str, password: str, ip: str) -> tuple[int, str]:
+    """Create a game account or verify existing credentials using Imlight."""
+    body = json.dumps({"Username": username, "Password": password, "ClientIp": ip}).encode("utf-8")
     request = Request(
         BRIDGE_URL, data=body, method="POST",
         headers={"Content-Type": "application/json",
@@ -126,12 +184,26 @@ def create_game_account(settings: Settings, username: str, password: str) -> tup
         with urlopen(request, timeout=20) as response:
             if response.status == 201:
                 return 201, "Account created. You can now sign in to Spiral Shuffle."
+            if response.status == 200:
+                return 200, "Game credentials verified. You can now sign in to Spiral Shuffle."
             return 503, "Registration temporarily unavailable."
     except HTTPError as exc:
-        if exc.code == 409:
-            return 409, "This username is unavailable."
+        # Translate only documented reason codes, never arbitrary bridge text,
+        # exceptions, account data or private authentication failures.
+        try:
+            detail = json.loads(exc.read(4096))
+            reason = detail.get("code") if isinstance(detail, dict) else None
+        except (ValueError, TypeError, OSError, AttributeError):
+            reason = None
+        known = BRIDGE_REJECTIONS.get(reason) if isinstance(reason, str) else None
+        if known and known[0] == exc.code:
+            return (403 if exc.code == 409 else exc.code), known[1]
+        if reason in ("bridge_forbidden", "account_unavailable"):
+            return 503, "The game account service is temporarily unavailable. Try again later."
+        if exc.code in (401, 403, 409):
+            return 403, "Unable to verify these game credentials. Check your username and password."
         if exc.code == 400:
-            return 400, "Please choose a different username or password."
+            return 400, "New accounts need a 12–32 character password without spaces. If this is an existing account, use its current game password."
         return 503, "Registration temporarily unavailable."
     except (URLError, TimeoutError, OSError, ValueError):
         return 503, "Game account creation is unavailable right now."
@@ -144,8 +216,8 @@ class Handler(BaseHTTPRequestHandler):
         # Do not log request body, password, headers, IP or username.
         print("portal-api: request handled", flush=True)
 
-    def json_reply(self, status: int, message: str, success: bool = False):
-        payload = json.dumps({("message" if success else "error"): message}).encode("utf-8")
+    def json_reply(self, status: int, message: str, success: bool = False, **extra):
+        payload = json.dumps({("message" if success else "error"): message, **extra}).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
@@ -161,6 +233,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self.json_reply(200, "Registration API is listening.", True)
+        elif self.path == "/deployment":
+            # Public operational metadata only. Never expose private logs,
+            # paths, environment, account data or arbitrary state fields.
+            path = ROOT / ".runtime/deploy/state.json"
+            try:
+                if path.stat().st_size > 8192:
+                    raise ValueError("Invalid deployment state")
+                state = json.loads(path.read_text())
+                revision = state.get("revision", "")
+                if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+                    raise ValueError("Invalid revision")
+                allowed = {"current", "waiting_for_main", "waiting_for_checks", "deploying", "rolled_back",
+                           "recovery_failed", "check_failed", "blocked_scope", "blocked_failed_revision", "blocked_failed_checks", "blocked_local_changes"}
+                public = {"revision":revision, "status":state.get("status") if state.get("status") in allowed else "unavailable"}
+                if type(state.get("updated_at")) is int:
+                    public["updated_at"] = state["updated_at"]
+                self.json_reply(200, "Deployment status.", True, deployment=public)
+            except (OSError, ValueError, TypeError, AttributeError):
+                self.json_reply(503, "Deployment status unavailable.")
         else:
             self.json_reply(404, "Not found.")
 
@@ -191,6 +282,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
     def do_POST(self):
+        access_enabled = getattr(self.settings, "access_enabled", False)
         if self.path != "/register":
             self.json_reply(404, "Not found.")
             return
@@ -211,6 +303,13 @@ class Handler(BaseHTTPRequestHandler):
         if ip is None:
             self.json_reply(403, "Registration proxy configuration invalid.")
             return
+        local_peer = access_enabled and ip in getattr(self.settings, "local_signup_peers", frozenset())
+        if access_enabled and not local_peer:
+            try:
+                ip = public_ipv4(ip)
+            except ValueError:
+                self.json_reply(400, "Use a public IPv4 connection to register or refresh game access.")
+                return
         try:
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
@@ -224,8 +323,9 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError, TypeError):
             self.json_reply(400, "Invalid registration data.")
             return
-        if not USER_RULE.fullmatch(username) or username in RESERVED or not PASS_RULE.fullmatch(password):
-            self.json_reply(400, "Use a lowercase username (3–20 characters) and a unique 12–32 character password without spaces.")
+        rejection = credential_error(username, password)
+        if rejection:
+            self.json_reply(400, rejection)
             return
         try:
             allowed = check_rate_limit(ip, self.settings.ip_salt)
@@ -235,11 +335,39 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed:
             self.json_reply(429, "Too many attempts; try again later.")
             return
-        if not verify_turnstile(self.settings, proof, ip):
+        if not verify_turnstile(self.settings, proof, None if local_peer else ip):
             self.json_reply(403, "Bot verification failed. Refresh and try again.")
             return
-        status, message = create_game_account(self.settings, username, password)
-        self.json_reply(status, message, success=(status == 201))
+        try:
+            # Charge the per-account budget only after bot verification, so an
+            # unauthenticated script cannot exhaust another account's budget.
+            account_allowed = check_rate_limit("account:" + username, self.settings.ip_salt)
+        except sqlite3.Error:
+            self.json_reply(503, "Game access temporarily unavailable.")
+            return
+        if not account_allowed:
+            self.json_reply(429, "Too many attempts; try again later.")
+            return
+        if access_enabled and not local_peer:
+            try:
+                self.settings.access_store.check_ready()
+            except (sqlite3.Error, OSError, ValueError):
+                self.json_reply(503, "Game access storage temporarily unavailable. Try again later.")
+                return
+        status, message = create_game_account(self.settings, username, password, ip)
+        if local_peer and status in (200, 201):
+            # Private peers still require CAPTCHA and native game credentials.
+            # Never insert a router/private address into the public allowlist or
+            # overwrite an existing public grant for this account.
+            message = "Game credentials accepted. Use these credentials in the launcher."
+        elif access_enabled and status in (200, 201):
+            try:
+                self.settings.access_store.grant(username, ip)
+            except (sqlite3.Error, OSError):
+                self.json_reply(503, "Game credentials accepted, but network access could not be saved. Retry with the same username and password.")
+                return
+            message = "Game access queued. Allow up to one minute, then use this username and password in the launcher. New accounts are created automatically."
+        self.json_reply(status, message, success=(status in (200, 201)))
 
 
 def main():

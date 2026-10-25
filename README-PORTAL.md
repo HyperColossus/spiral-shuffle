@@ -4,6 +4,12 @@
 
 The **website stays on GitHub Pages** at https://spiral.hypercoloss.us/ . This add-on supplies only the server-side API that GitHub Pages cannot run.
 
+Optional signup-based firewall access is documented in [README-IP-ACCESS.md](README-IP-ACCESS.md).
+It is disabled by default. Enable it only after the HTTPS API and separate firewall worker are tested.
+Players use one game username/password form: new usernames create normal accounts;
+existing usernames must verify the existing password before updating IP access.
+No additional service account or player access key is required.
+
 **Docker RavenDB database:** To start with new empty accounts (the selected option), use the **Fresh installation** instructions in [docker/README.md](docker/README.md). To preserve existing characters, use the separate import procedure instead. Complete the appropriate database switch **before installing the registration bridge**. The website and Imlight must use the same `Playerdata` database. Do not point the public website at RavenDB.
 
 ## Architecture
@@ -81,7 +87,7 @@ with urllib.request.urlopen(req, timeout=30) as response:
 PY
 ```
 
-A response of **201** means Imlight reports account creation. Log into the game with those same credentials to verify end-to-end behavior. Only share response codes and errors; do not paste credentials into chat.
+A response of **201** means Imlight reports account creation; **200** means an existing account's credentials were verified. The private bridge uses `/enter` for this combined flow. Wrong existing passwords return 403 and never change an IP grant or persisted password. Log into the game with those same credentials to verify end-to-end behavior. Only share response codes and errors; do not paste credentials into chat.
 
 ## C. Set up public HTTPS (after the local test works)
 
@@ -98,7 +104,7 @@ SPIRAL_TURNSTILE_SECRET=YOUR_PRIVATE_TURNSTILE_SECRET
 SPIRAL_GAME_HOST=YOUR_PUBLIC_GAME_HOST
 ```
 
-`SPIRAL_GAME_HOST` documents your host; the active backend does not depend on it. Keep the secret **off GitHub**, and do not paste it in chat. Public mode checks the admin credential length in Imlight config, requires HTTPS origin, and validates Turnstile tokens server-side with hostname/action checks. It also rate-limits registration attempts and avoids storing passwords or raw client IPs.
+`SPIRAL_GAME_HOST` documents your host; the active backend does not depend on it. Keep the secret **off GitHub**, and do not paste it in chat. Public mode checks the admin credential length in Imlight config, requires HTTPS origin, and validates Turnstile tokens server-side with hostname/action checks. Signup rate limits use hashed IPs. The optional IP-access feature additionally stores private raw IPv4 grants; it never stores passwords.
 
 4. Restart the API after updating its environment. When your HTTPS endpoint is actually reachable, edit `docs/index.html` in your GitHub fork, near `window.SPIRAL_SITE_CONFIG`:
 

@@ -22,11 +22,13 @@ internal static class PortalRegistration {
     private const string LocalPrefix = "http://127.0.0.1:12772/";
     private static readonly object CreationLock = new();
     private static readonly Regex UsernameRule = new("^[a-z][a-z0-9_]{2,19}$", RegexOptions.CultureInvariant);
-    private static readonly Regex PasswordRule = new("^[!-~]{12,32}$", RegexOptions.CultureInvariant);
+    private static readonly Regex PasswordRule = new(@"\A[!-~]{12,32}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex CredentialRule = new(@"\A[!-~]{1,32}\z", RegexOptions.CultureInvariant);
 
     private sealed class RegistrationRequest {
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
+        public string ClientIp { get; set; } = "";
     }
 
     internal static void Start() {
@@ -65,8 +67,8 @@ internal static class PortalRegistration {
         }
     }
 
-    private static bool SecretMatches(string? supplied, string expected) {
-        if (supplied == null) return false;
+    private static bool SecretMatches(string? supplied, string? expected) {
+        if (supplied == null || expected == null) return false;
         var a = Encoding.ASCII.GetBytes(supplied);
         var b = Encoding.ASCII.GetBytes(expected);
         return a.Length == b.Length && CryptographicOperations.FixedTimeEquals(a, b);
@@ -78,12 +80,13 @@ internal static class PortalRegistration {
             await Reply(context, 200, "Registration bridge ready.");
             return;
         }
-        if (request.HttpMethod != "POST" || request.Url?.AbsolutePath != "/register") {
+        bool enter = request.Url?.AbsolutePath == "/enter";
+        if (request.HttpMethod != "POST" || (!enter && request.Url?.AbsolutePath != "/register")) {
             await Reply(context, 404, "Not found.");
             return;
         }
         if (!SecretMatches(request.Headers["X-Spiral-Token"], token)) {
-            await Reply(context, 403, "Forbidden.");
+            await Reply(context, 403, "Forbidden.", "bridge_forbidden");
             return;
         }
         if (request.ContentLength64 < 2 || request.ContentLength64 > 1024 ||
@@ -100,28 +103,80 @@ internal static class PortalRegistration {
         catch (JsonException) { await Reply(context, 400, "Invalid registration data."); return; }
         var username = form?.Username?.Trim().ToLowerInvariant() ?? "";
         var password = form?.Password ?? "";
-        if (!UsernameRule.IsMatch(username) || !PasswordRule.IsMatch(password) ||
-            username is "admin" or "administrator" or "moderator" or "support" or "system" or "staff" or "gamemaster") {
-            await Reply(context, 400, "Invalid username or password.");
+        if (!UsernameRule.IsMatch(username)) {
+            await Reply(context, 400, "Use 3–20 letters, digits or underscores, starting with a letter.", "username_format");
+            return;
+        }
+        if (username is "admin" or "administrator" or "moderator" or "support" or "system" or "staff" or "gamemaster") {
+            await Reply(context, 400, "That username is reserved. Choose another username.", "username_reserved");
+            return;
+        }
+        if (!CredentialRule.IsMatch(password)) {
+            await Reply(context, 400, "Enter a password of at most 32 printable characters without spaces.", "password_format");
             return;
         }
 
-        bool created;
+        string clientIp = form?.ClientIp ?? "";
+        if (enter && !IPAddress.TryParse(clientIp, out _)) {
+            await Reply(context, 400, "Invalid connection address.");
+            return;
+        }
+        int status;
+        string? reason = null;
         lock (CreationLock) {
             // Wait for the username lookup's RavenDB index rather than using a stale result.
             using var session = PlayerDatabase.Instance.Store.OpenSession();
-            bool exists = session.Query<Account>(collectionName: AccountCollection.CollectionName)
+            var existing = session.Query<Account>(collectionName: AccountCollection.CollectionName)
                 .Customize(query => query.WaitForNonStaleResults(TimeSpan.FromSeconds(10)))
-                .Any(a => a.Username == username);
-            created = !exists && DatabaseUtilities.CreateEmbeddedDatabaseAccount(
-                username, "", password, AuthLevel.None) is not null;
+                .FirstOrDefault(a => a.Username == username);
+            if (enter && InfractionCollection.IsIpBanned(clientIp)) {
+                status = 403;
+                reason = "network_blocked";
+            } else if (existing is not null) {
+                if (!enter) {
+                    status = 409; // Compatibility for old, create-only clients.
+                    reason = "username_taken";
+                } else {
+                    // Same native hash and account restrictions as game login.
+                    // Never change a persisted password or create a game session.
+                    var account = AccountCollection.GetAccount(username);
+                    bool matches = SecretMatches(DatabaseUtilities.CreateHashedPassword(password), account?.PasswordHash);
+                    if (account is null || account.InfractionHistory is null) {
+                        status = 503;
+                        reason = "account_unavailable";
+                    } else if (!matches) {
+                        status = 403;
+                        reason = "wrong_password";
+                    } else if (account.IsLocked) {
+                        status = 403;
+                        reason = "account_locked";
+                    } else if (account.InfractionHistory.IsCurrentlyBanned) {
+                        status = 403;
+                        reason = "account_banned";
+                    } else {
+                        status = 200;
+                    }
+                }
+            } else if (!PasswordRule.IsMatch(password)) {
+                status = 400;
+                reason = "new_password_requirements";
+            } else {
+                status = DatabaseUtilities.CreateEmbeddedDatabaseAccount(
+                    username, "", password, AuthLevel.None) is not null ? 201 : 503;
+            }
         }
-        await Reply(context, created ? 201 : 409,
-            created ? "Account created. Sign in to Spiral Shuffle." : "Username unavailable.");
+        await Reply(context, status, status switch {
+            200 => "Game credentials verified.",
+            201 => "Game account created.",
+            400 => "New accounts require a 12–32 character password without spaces.",
+            403 => "Unable to verify these game credentials.",
+            409 => "Username unavailable.",
+            _ => "Game access temporarily unavailable."
+        }, reason);
     }
 
-    private static async Task Reply(HttpListenerContext context, int status, string message) {
-        byte[] json = JsonSerializer.SerializeToUtf8Bytes(new { message });
+    private static async Task Reply(HttpListenerContext context, int status, string message, string? code = null) {
+        byte[] json = JsonSerializer.SerializeToUtf8Bytes(new { message, code });
         var response = context.Response;
         response.StatusCode = status;
         response.ContentType = "application/json; charset=utf-8";

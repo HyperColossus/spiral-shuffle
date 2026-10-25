@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import io
 import os
 from pathlib import Path
 import tempfile
@@ -10,11 +11,77 @@ import unittest
 from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from urllib.parse import parse_qs
 
 import portal_api as api
 
 
 class RegistrationApiTests(unittest.TestCase):
+    def test_turnstile_stays_enforced_when_home_peer_omits_optional_remoteip(self):
+        settings = type("Fake", (), {"public":True, "turnstile_secret":"test-secret", "host":"spiral.hypercoloss.us"})()
+        for ip in (None, "8.8.8.8"):
+            body=json.dumps({"success":True,"hostname":"spiral.hypercoloss.us","action":"register"}).encode()
+            with mock.patch.object(api, "urlopen", return_value=io.BytesIO(body)) as verify:
+                self.assertTrue(api.verify_turnstile(settings, "proof", ip))
+                payload=parse_qs(verify.call_args.args[0].data.decode())
+                self.assertEqual(payload["response"], ["proof"])
+                self.assertEqual(payload.get("remoteip"), [ip] if ip else None)
+        self.assertFalse(api.verify_turnstile(settings, "", None))
+
+    def test_bridge_client_accepts_created_and_verified_accounts(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for status in (200, 201):
+            response = mock.MagicMock()
+            response.__enter__.return_value.status = status
+            with mock.patch.object(api, "urlopen", return_value=response) as send:
+                result, _ = api.create_game_account(settings, "player_one", "ExamplePassword123!", "8.8.8.8")
+            self.assertEqual(result, status)
+            request = send.call_args.args[0]
+            self.assertEqual(request.full_url, "http://127.0.0.1:12772/enter")
+            self.assertEqual(json.loads(request.data), {"Username":"player_one", "Password":"ExamplePassword123!", "ClientIp":"8.8.8.8"})
+
+    def test_bridge_client_wrong_password_and_unavailable_versions_fail_closed(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for bridge_status, expected in ((403, 403), (404, 503), (500, 503)):
+            with mock.patch.object(api, "urlopen", side_effect=HTTPError(api.BRIDGE_URL, bridge_status, "Error", {}, None)):
+                status, _ = api.create_game_account(settings, "player_one", "ExamplePassword123!", "8.8.8.8")
+                self.assertEqual(status, expected)
+
+    def test_actionable_username_and_password_validation(self):
+        cases = [
+            ("", "valid-password", "Enter a username."),
+            ("ab", "valid-password", "between 3 and 20"),
+            ("1player", "valid-password", "start with a letter"),
+            ("my-player", "valid-password", "only letters, numbers and underscores"),
+            ("admin", "valid-password", "reserved"),
+            ("player_one", "", "Enter your password."),
+            ("player_one", "x" * 33, "longer than 32"),
+            ("player_one", "has spaces", "cannot contain spaces"),
+        ]
+        for username, password, expected in cases:
+            with self.subTest(username=username):
+                self.assertIn(expected, api.credential_error(username, password))
+        self.assertIsNone(api.credential_error("player_one", "legacy"))
+
+    def test_bridge_reason_codes_produce_safe_specific_messages(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for reason, (status, message) in api.BRIDGE_REJECTIONS.items():
+            body = io.BytesIO(json.dumps({"code":reason,"message":"PRIVATE INTERNAL DETAIL"}).encode())
+            with mock.patch.object(api, "urlopen", side_effect=HTTPError(api.BRIDGE_URL,status,"Error",{},body)):
+                actual, detail = api.create_game_account(settings,"player_one","ExamplePassword123!","8.8.8.8")
+            self.assertEqual(actual, 403 if status == 409 else status)
+            self.assertEqual(detail, message)
+            self.assertNotIn("PRIVATE INTERNAL DETAIL", detail)
+
+    def test_unknown_bridge_errors_do_not_expose_raw_details(self):
+        settings = type("Fake", (), {"bridge_token":"a" * 64})()
+        for code in ("bridge_forbidden", "unknown_private_error", ["wrong_password"]):
+            body=io.BytesIO(json.dumps({"code":code,"message":"PRIVATE INTERNAL DETAIL"}).encode())
+            with mock.patch.object(api,"urlopen",side_effect=HTTPError(api.BRIDGE_URL,403,"Error",{},body)):
+                status, detail=api.create_game_account(settings,"player_one","ExamplePassword123!","8.8.8.8")
+            self.assertEqual(status,503 if code == "bridge_forbidden" else 403)
+            self.assertNotIn("PRIVATE INTERNAL DETAIL",detail)
+
     def test_username_and_password_policy(self):
         self.assertTrue(api.USER_RULE.fullmatch("player_one"))
         self.assertFalse(api.USER_RULE.fullmatch("Admin"))

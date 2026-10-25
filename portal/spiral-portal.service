@@ -1,12 +1,15 @@
 [Unit]
 Description=Spiral Shuffle GitHub Pages registration API
 After=network-online.target
+Requires=spiral-game.service
+After=spiral-game.service
+PartOf=spiral-game.service
 
 [Service]
 Type=simple
-WorkingDirectory=%h/spiral-shuffle
-EnvironmentFile=%h/spiral-shuffle/.runtime/portal/portal.env
-ExecStart=/usr/bin/python3 %h/spiral-shuffle/portal_api.py
+WorkingDirectory=@ROOT@
+EnvironmentFile=@ROOT@/.runtime/portal/portal.env
+ExecStart=/usr/bin/python3 @ROOT@/portal_api.py
 Restart=on-failure
 RestartSec=5
 UMask=0077

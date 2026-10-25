@@ -1,0 +1,42 @@
+name: Spiral deployment gate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Compile operations and API
+        run: python3 -m py_compile auto_deploy.py service_runtime.py install_services.py portal_api.py portal_access.py portal_bridge.py
+      - name: Validate portal and deployment safeguards
+        run: |
+          python3 -m unittest discover -s tests -p 'test_portal*.py' -v
+          python3 -m unittest discover -s tests -p 'test_operations.py' -v
+          python3 -m unittest discover -s tests -p 'test_docker_db.py' -v
+      - name: Validate website interactions
+        run: node tests/portal_ui.mjs
+      - name: Compile and test credential bridge
+        run: dotnet run --project tests/portal-bridge-tests/PortalBridgeTests.csproj -c Release
+      - name: Validate service unit syntax
+        run: |
+          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-game.service > /tmp/spiral-game.service
+          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-portal.service > /tmp/spiral-portal.service
+          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-auto-deploy.service > /tmp/spiral-auto-deploy.service
+          cp portal/spiral-auto-deploy.timer /tmp/spiral-auto-deploy.timer
+          systemd-analyze verify --man=no /tmp/spiral-game.service /tmp/spiral-portal.service /tmp/spiral-auto-deploy.service /tmp/spiral-auto-deploy.timer

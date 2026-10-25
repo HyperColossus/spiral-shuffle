@@ -1,0 +1,11 @@
+[Unit]
+Description=Check tested Spiral Shuffle main updates every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=120s
+AccuracySec=5s
+Unit=spiral-auto-deploy.service
+
+[Install]
+WantedBy=timers.target

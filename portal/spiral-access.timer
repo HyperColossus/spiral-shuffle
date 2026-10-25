@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply registered-player access every 30 seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+AccuracySec=1s
+Unit=spiral-access.service
+
+[Install]
+WantedBy=timers.target
