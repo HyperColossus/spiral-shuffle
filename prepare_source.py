@@ -208,6 +208,51 @@ def patch_combat_accuracy() -> None:
             "            startingAccuracy += effect.m_effectParam;")
 
 
+def patch_crown_shop() -> None:
+    replace("WizardData/Models/Player/Account.cs",
+            "    public int PurchasedCharacterSlots { get; set; }",
+            """    public int PurchasedCharacterSlots { get; set; }
+    public int Crowns { get; set; } = 50000;
+
+    public bool SetCrowns(int crownsAmount) {
+        this.Crowns = crownsAmount;
+        return AccountCollection.UpdateCrowns(this.AccountId, crownsAmount);
+    }""")
+    replace("WizardData/Collections/AccountCollection.cs",
+            """    public static bool RemovePurchasedCharacterSlot(ulong accountId) {
+        return UpdateAccount(accountId, account => {
+            if (account.PurchasedCharacterSlots > 0)
+                --account.PurchasedCharacterSlots;
+        });
+    }""",
+            """    public static bool RemovePurchasedCharacterSlot(ulong accountId) {
+        return UpdateAccount(accountId, account => {
+            if (account.PurchasedCharacterSlots > 0)
+                --account.PurchasedCharacterSlots;
+        });
+    }
+
+    public static bool UpdateCrowns(ulong accountId, int crownsAmount) {
+        return UpdateAccount(accountId, account => {
+            account.Crowns = crownsAmount;
+        });
+    }""")
+
+
+def patch_director_crown_shop() -> None:
+    program = ROOT / ".build/upstream/Imlight-b07987168fcfa2d123a5d78df90ca0c76405e427/src/Imlight.Director/Program.cs"
+    if not program.exists():
+        return
+    text = program.read_text(encoding="utf-8-sig")
+    if "CrownShopHandler.Load();" in text:
+        return
+    before = "        SpiralDB.Load();"
+    after = "        SpiralDB.Load();\n        Imlight.CoreLib.Game.CrownShop.CrownShopHandler.Load();"
+    if text.count(before) != 1:
+        raise ValueError("Could not find SpiralDB.Load() in Director Program.cs")
+    program.write_text(text.replace(before, after), encoding="utf-8")
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -218,6 +263,8 @@ def main() -> None:
     patch_world_state()
     patch_local_login()
     patch_combat_accuracy()
+    patch_crown_shop()
+    patch_director_crown_shop()
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
@@ -238,7 +285,11 @@ def main() -> None:
     shutil.copy2(ROOT / "CreatureRandomization.cs", SOURCE / "Game/CreatureRandomization.cs")
     shutil.copy2(ROOT / "EnemyInspectorService.cs", SOURCE / "Game/Services/EnemyInspectorService.cs")
     shutil.copy2(ROOT / "EnemyInspectorData.cs", SOURCE / "Game/EnemyInspectorData.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),")
+    (SOURCE / "Game/CrownShop").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / "CrownShopModels.cs", SOURCE / "Game/CrownShop/CrownShopModels.cs")
+    shutil.copy2(ROOT / "CrownShopHandler.cs", SOURCE / "Game/CrownShop/CrownShopHandler.cs")
+    shutil.copy2(ROOT / "CrownShopService.cs", SOURCE / "Game/Services/CrownShopService.cs")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }

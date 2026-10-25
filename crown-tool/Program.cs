@@ -23,9 +23,22 @@ if (args.Length == 1 && args[0] == "test") {
     Console.WriteLine("PASS: Crown price zero, gold and unknown fields preserved, missing prices untouched, idempotent BIND round trip.");
     return;
 }
+if (args.Length == 1 && args[0] == "verify-crownshop") {
+    var ini = Path.GetFullPath(".runtime/server/Config/Imlight.ini");
+    if (!File.Exists(ini)) ini = Path.GetFullPath("../.runtime/server/Config/Imlight.ini");
+    if (File.Exists(ini)) Imlight.Common.ConfigurationManager.Initialize(ini);
+    Imlight.CoreLib.Game.CrownShop.CrownShopHandler.Load();
+    var data = Imlight.CoreLib.Game.CrownShop.CrownShopHandler.GetCrownShopData();
+    var items = Imlight.CoreLib.Game.CrownShop.CrownShopHandler.GetCrownShopItems();
+    if (data.IsEmpty || data.Length == 0) throw new Exception("Serialized CrownShopData is empty!");
+    if (items.Count < 1000) throw new Exception($"Too few CrownShop items: {items.Count}");
+    Console.WriteLine($"PASS: CrownShopHandler loaded {items.Count} items, serialized payload length = {data.Length} bytes.");
+    return;
+}
 if (args.Length != 3 || args[0] is not ("build" or "verify"))
     throw new ArgumentException("Usage: CrownTool build|verify INPUT_ROOT_WAD OUTPUT_ZIP_OR_BASELINE_WAD");
 using var stream = File.OpenRead(args[1]);
+
 Archive archive = ArchiveParser.Parse(stream) ?? throw new InvalidDataException("Invalid Root.wad");
 if (args[0] == "build") {
     if (File.Exists(args[2])) throw new IOException("Output already exists.");

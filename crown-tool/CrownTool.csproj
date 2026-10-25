@@ -8,6 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="$(ImlightDirectory)/Imcodec.*.dll" />
+    <Reference Include="$(ImlightDirectory)/Imlight.Common.dll" />
+    <ProjectReference Include="../server-build/Imlight.CoreLib.csproj" />
     <Compile Include="../asset-tool/BindDocument.cs" Link="BindDocument.cs" />
     <Compile Include="../asset-tool/CrownPricing.cs" Link="CrownPricing.cs" />
   </ItemGroup>
