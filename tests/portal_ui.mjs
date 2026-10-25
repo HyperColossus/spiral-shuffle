@@ -43,7 +43,7 @@ function page(config, mode = 'success') {
   return { get, widgets, requests, get executions() { return executes; } };
 }
 
-const locked = page({});
+const locked = page({ registrationApi: "", turnstileSiteKey: "" });
 assert.equal(locked.widgets.length, 0);
 assert.equal(locked.get('create-account').disabled, true);
 assert.ok(!html.includes('id="access-key"'));
