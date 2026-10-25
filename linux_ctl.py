@@ -6,6 +6,7 @@ checkout's .runtime directory. Run as the unprivileged account that built it.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import signal
@@ -34,6 +35,15 @@ def _pid_path(which: str) -> Path:
 
 def _expected_argument(which: str) -> str:
     return str((ROOT / "host.py").resolve()) if which == "patch" else str((SERVER / "Imlight.Director.dll").resolve())
+
+
+def configured_game_ip() -> str:
+    config = SERVER / "Config" / "Imlight.ini"
+    for line in config.read_text(encoding="utf-8-sig").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip() == "GameServerIP":
+            return str(ipaddress.ip_address(value.strip()))
+    raise ValueError(f"GameServerIP is missing from {config}")
 
 
 def owned_process(which: str) -> int | None:
@@ -116,10 +126,11 @@ def start() -> int:
     settings = json.loads(cfg.read_text())
     python = settings.get("python", sys.executable)
     dotnet = settings.get("dotnet", "dotnet")
-    patch_pid = spawn("patch", [python, _expected_argument("patch"), "--port", "12379"], ROOT)
+    game_ip = configured_game_ip()
+    patch_pid = spawn("patch", [python, _expected_argument("patch"), "--host", game_ip, "--port", "12379"], ROOT)
     try:
-        url = f"http://127.0.0.1:12379/{REVISION}/LatestFileList.bin"
-        # host.py reads the patch directory and owns only 127.0.0.1:12379.
+        url = f"http://{game_ip}:12379/{REVISION}/LatestFileList.bin"
+        # host.py serves only patch assets on the configured game interface.
         for _ in range(30):
             if not owned_process("patch"):
                 raise RuntimeError("Patch process exited; see .runtime/logs/patch.log")
