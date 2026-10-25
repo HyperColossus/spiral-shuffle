@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 import struct
 import xml.etree.ElementTree as ET
 import zipfile
@@ -93,15 +94,25 @@ def build_wad(source: Path, destination: Path, overrides: dict[str, bytes]) -> d
 
 
 def update_lists(metadata: dict[str, int]) -> None:
-    xml = ET.parse(BASE / "LatestFileList.xml")
-    records = [record for record in xml.iter("RECORD") if record.findtext("SrcFileName") == "Data/GameData/Root.wad"]
-    if len(records) != 1:
+    base_text = (BASE / "LatestFileList.xml").read_text(encoding="utf-8")
+    pattern = r'(<RECORD>\s*<SrcFileName TYPE="STR">Data/GameData/Root\.wad</SrcFileName>.*?</RECORD>)'
+    match = re.search(pattern, base_text, re.DOTALL)
+    if not match:
         raise ValueError("Root patch record missing or duplicated")
-    record = records[0]
-    original = {name: int(record.findtext(name, "0")) for name in metadata}
+    rec = match.group(0)
+    original = {}
+    for name in ("Size", "HeaderSize", "CompressedHeaderSize", "CRC", "HeaderCRC"):
+        val_match = re.search(rf'<{name} TYPE="UINT">(\d+)</{name}>', rec)
+        if not val_match:
+            raise ValueError(f"Field {name} missing in Root.wad RECORD")
+        original[name] = int(val_match.group(1))
     for name, value in metadata.items():
-        record.find(name).text = str(value)
-    xml.write(OUTPUT / "LatestFileList.xml", encoding="utf-8", xml_declaration=True)
+        rec, count = re.subn(rf'(<{name} TYPE="UINT">)\d+(</{name}>)', rf'\g<1>{value}\g<2>', rec)
+        if count != 1:
+            raise ValueError(f"Unexpected replacement count for {name}")
+    fixed_text = base_text[:match.start()] + rec + base_text[match.end():]
+    (OUTPUT / "LatestFileList.xml").write_text(fixed_text, encoding="utf-8")
+
     binary = bytearray((BASE / "LatestFileList.bin").read_bytes())
     filename = b"Data/GameData/Root.wad"
     location = binary.find(filename)
