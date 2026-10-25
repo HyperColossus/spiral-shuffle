@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#080b1b">
   <meta name="description" content="Spiral Shuffle — friends-only multiplayer randomizer server.">
   <title>Spiral Shuffle</title>
+  <meta name="robots" content="noindex, nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -98,6 +99,12 @@
       text-wrap: balance;
     }
     .ip {
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: none;
+      text-align: center;
+      cursor: pointer;
       display: block;
       margin: 26px 0 35px;
       color: var(--mint);
@@ -110,6 +117,7 @@
       text-shadow: 0 0 48px rgba(142, 250, 227, .25);
       user-select: all;
     }
+    .ip:hover, .ip.copied { color: #fff; }
     .ip.pending {
       color: #cecae8;
       font-size: clamp(22px, 4.3vw, 31px);
@@ -198,9 +206,9 @@
 
   <main class="center">
     <section class="panel" aria-label="Spiral Shuffle account registration">
-      <h1>Spiral Shuffle</h1>
 
-      <div id="server-address" class="ip pending" aria-label="Game server address">IP COMING SOON</div>
+      <button id="server-address" class="ip" type="button" aria-label="Copy server IP address" title="Click to copy">70.23.164.208</button>
+      <span id="copy-status" class="sr-only" aria-live="polite"></span>
 
       <form id="signup-form" autocomplete="on">
         <label for="username" class="sr-only">Username</label>
@@ -213,13 +221,13 @@
 
         <label for="password" class="sr-only">Password</label>
         <input class="input" id="password" name="password" type="password"
-          placeholder="Password" autocomplete="new-password"
-          minlength="12" maxlength="32"
-          title="12–32 characters without spaces" required disabled>
+          placeholder="Password" autocomplete="current-password"
+          minlength="1" maxlength="32"
+          title="New accounts need 12–32 characters without spaces" required disabled>
 
         <div class="verification" id="verification"></div>
 
-        <button class="button" id="create-account" type="submit" disabled>Create Account</button>
+        <button class="button" id="create-account" type="submit" disabled>Continue</button>
         <p id="status" class="message sr-only" aria-live="polite">Account registration is not available yet.</p>
       </form>
     </section>
@@ -230,7 +238,7 @@
     // gameHost must be the GAME SERVER'S PUBLIC IP or hostname, not the Pages subdomain.
     // Leave keys blank until an independently secured HTTPS registration API exists.
     window.SPIRAL_SITE_CONFIG = {
-      gameHost: "",
+      gameHost: "70.23.164.208",
       gamePort: 12010,
       registrationApi: "",
       turnstileSiteKey: ""
@@ -243,11 +251,28 @@
       const config = window.SPIRAL_SITE_CONFIG || {};
       const address = document.getElementById("server-address");
       const host = typeof config.gameHost === "string" ? config.gameHost.trim() : "";
-      const port = Number.isInteger(config.gamePort) && config.gamePort > 0 && config.gamePort < 65536
-        ? config.gamePort : 12010;
       if (/^[a-z0-9.-]+$/i.test(host) && host.length < 254) {
-        address.textContent = host + ":" + port;
-        address.classList.remove("pending");
+        address.textContent = host;
+        const copyStatus = document.getElementById("copy-status");
+        address.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(host);
+            copyStatus.textContent = "IP address copied.";
+            address.title = "Copied";
+            address.classList.add("copied");
+            setTimeout(() => {
+              address.title = "Click to copy";
+              address.classList.remove("copied");
+            }, 1500);
+          } catch (_) {
+            const range = document.createRange();
+            range.selectNodeContents(address);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            copyStatus.textContent = "IP selected. Use Copy to copy the address.";
+          }
+        });
       }
 
       const form = document.getElementById("signup-form");
@@ -290,8 +315,8 @@
                 status.textContent = "Choose a lowercase username, 3–20 characters.";
                 return;
               }
-              if (!/^[!-~]{12,32}$/.test(password)) {
-                status.textContent = "Use a password of 12–32 characters without spaces.";
+              if (!/^[!-~]{1,32}$/.test(password)) {
+                status.textContent = "Enter your game password. New accounts need 12–32 characters without spaces.";
                 return;
               }
               const token = window.turnstile.getResponse(widget);
@@ -300,7 +325,7 @@
                 return;
               }
               button.disabled = true;
-              button.textContent = "Creating…";
+              button.textContent = "Connecting…";
               try {
                 const response = await fetch(api, {
                   method: "POST",
@@ -317,16 +342,18 @@
                 } else {
                   form.reset();
                   status.classList.add("success");
-                  status.textContent = "Account created. You can now log in to the game.";
+                  status.textContent = "Access queued.";
+
                 }
               } catch (_) {
                 status.textContent = "Cannot reach the registration service right now.";
               } finally {
                 window.turnstile.reset(widget);
-                button.textContent = "Create Account";
+                button.textContent = "Continue";
                 button.disabled = false;
               }
             });
+
           } catch (_) {
             status.textContent = "Registration isn't available yet.";
           }
