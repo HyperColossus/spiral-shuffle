@@ -50,7 +50,7 @@ assert.equal(enabled.get('create-account').disabled, false);
 enabled.get('username').value = 'new_player';
 enabled.get('password').value = 'Example-Private-Password';
 await enabled.get('signup-form').events.submit({ preventDefault() {} });
-assert.equal(enabled.get('status').textContent, 'Queued.');
+assert.equal(enabled.get('status').textContent, 'Credentials accepted.');
 assert.deepEqual(enabled.requests[0].body, { username: 'new_player', password: 'Example-Private-Password', turnstileToken: 'captcha-proof' });
 // The same two fields also refresh an existing player's access.
 enabled.get('password').value = 'legacy';
