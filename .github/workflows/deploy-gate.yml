@@ -31,6 +31,8 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_docker_db.py' -v
       - name: Validate website interactions
         run: node tests/portal_ui.mjs
+      - name: Validate reward service attachment lifecycle
+        run: dotnet run --project tests/spell-reward-lifecycle-tests/RewardLifecycleTests.csproj -c Release
       - name: Compile and test credential bridge
         run: dotnet run --project tests/portal-bridge-tests/PortalBridgeTests.csproj -c Release
       - name: Validate service unit syntax
