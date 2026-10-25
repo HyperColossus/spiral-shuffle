@@ -115,7 +115,9 @@
       line-height: 1.25;
       overflow-wrap: anywhere;
       text-shadow: 0 0 48px rgba(142, 250, 227, .25);
-      user-select: all;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .ip:hover, .ip.copied { color: #fff; }
     .ip.pending {
@@ -265,12 +267,24 @@
               address.classList.remove("copied");
             }, 1500);
           } catch (_) {
-            const range = document.createRange();
-            range.selectNodeContents(address);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-            copyStatus.textContent = "IP selected. Use Copy to copy the address.";
+            // Copy through an off-screen field if Clipboard API access is
+            // blocked. Never select or highlight the visible IP button.
+            const field = document.createElement("textarea");
+            field.value = host;
+            field.readOnly = true;
+            field.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+            field.setAttribute("aria-hidden", "true");
+            const previousFocus = document.activeElement;
+            document.body.appendChild(field);
+            let copied = false;
+            try {
+              field.select();
+              copied = document.execCommand("copy");
+            } finally {
+              field.remove();
+              if (previousFocus && previousFocus.focus) previousFocus.focus();
+            }
+            copyStatus.textContent = copied ? "IP address copied." : "Clipboard access blocked by your browser.";
           }
         });
       }
