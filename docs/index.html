@@ -99,11 +99,22 @@
     .download-heading h2 { margin: 0; font: 600 clamp(22px, 4vw, 30px) var(--display); letter-spacing: -.045em; }
     .back-link, .download-link { color: var(--accent); font: 500 14px var(--body); text-decoration: none; }
     .back-link:hover, .download-link:hover { color: var(--mint); }
-    .download-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+    .download-grid { align-items: start; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
     .download-card { display: flex; flex-direction: column; min-height: 270px; padding: 30px 26px; border: 1px solid var(--border); border-radius: 22px; background: linear-gradient(155deg, rgba(13, 16, 38, .78), rgba(6, 14, 30, .86)); }
     .download-card h3 { margin: 0 0 15px; font: 600 29px var(--display); letter-spacing: -.045em; }
     .download-card p { margin: 0 0 28px; color: var(--soft); font-size: 15px; line-height: 1.6; }
     .download-card .button { display: flex; justify-content: center; align-items: center; margin-top: auto; text-decoration: none; }
+    .manual-guide { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+    .manual-guide summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--accent); font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; }
+    .manual-guide summary::-webkit-details-marker { display: none; }
+    .manual-guide summary::after { content: "+"; font-size: 20px; line-height: 1; }
+    .manual-guide[open] summary::after { content: "−"; }
+    .manual-guide summary:hover { color: var(--mint); }
+    .manual-guide ol { padding-left: 19px; margin: 17px 0 0; color: var(--soft); font-size: 13px; line-height: 1.65; }
+    .manual-guide li + li { margin-top: 11px; }
+    .manual-guide code { color: var(--white); font-size: 12px; overflow-wrap: anywhere; }
+    .manual-guide .manual-settings { margin: 14px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(3, 7, 24, .35); color: var(--soft); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+    .manual-guide .manual-note { margin: 14px 0 0; color: var(--soft); font-size: 12px; line-height: 1.6; }
     .download-size { display: block; margin-top: 13px; text-align: center; color: var(--soft); font-size: 12px; }
     .download-note { margin: 24px 0 0; text-align: center; color: var(--soft); font-size: 13px; }
     @media (max-width: 620px) {
@@ -299,12 +310,50 @@
           <p>New here? Get the complete client, ready for our server.</p>
           <a class="button" href="https://register.spiral.hypercoloss.us/downloads/2026-10-25/SpiralShuffle-Full.zip">Download Full Client</a>
           <span class="download-size">Windows · 2.32 GB</span>
+          <details class="manual-guide">
+            <summary>Manual Install</summary>
+            <ol>
+              <li>Download the Full Client ZIP and choose <strong>Extract All</strong> in Windows.</li>
+              <li>Move the extracted <code>Client</code> folder to where you want the game installed. Allow at least 15 GB free for downloading and extraction.</li>
+              <li>In that folder, open <code>PatchClient/BankA/PatchConfig.xml</code> and <code>PatchClient/BankB/PatchConfig.xml</code> in Notepad. Set the following attributes in <strong>both files</strong>, keeping the surrounding quotes.</li>
+            </ol>
+            <div class="manual-settings">
+              <code>PatchServerHostname host</code> → <code>70.23.164.208</code><br>
+              <code>PatchServerPort port</code> → <code>12510</code><br>
+              <code>LoginHostname host</code> → <code>70.23.164.208</code><br>
+              <code>LoginPort port</code> → <code>12010</code><br>
+              <code>CommandLine args</code> → <code>-L 70.23.164.208 12010 @LOCALE_PARAMETERS</code>
+            </div>
+            <ol start="4">
+              <li>Save both files, then open <code>Wizard101.exe</code> in your client folder. You can create a desktop shortcut to it.</li>
+            </ol>
+            <p class="manual-note">Sign in on this website first to authorize your connection. Use the same account in the launcher. Install.cmd is not needed for manual setup.</p>
+          </details>
         </article>
         <article class="download-card">
           <h3>Patch</h3>
           <p>Already installed? Connect your existing Spiral Shuffle client.</p>
           <a class="button" href="https://register.spiral.hypercoloss.us/downloads/2026-10-25/SpiralShuffle-Patch.zip">Download Patch</a>
           <span class="download-size">Windows · 3.4 KB</span>
+          <details class="manual-guide">
+            <summary>Manual Patch</summary>
+            <ol>
+              <li>Close the game and launcher. Open your existing Spiral Shuffle folder, not your official game installation.</li>
+              <li>Back up <code>PatchClient/BankA/PatchConfig.xml</code> and <code>PatchClient/BankB/PatchConfig.xml</code>.</li>
+              <li>Open both originals in Notepad. Set the following attributes in <strong>both files</strong>, keeping the surrounding quotes.</li>
+            </ol>
+            <div class="manual-settings">
+              <code>PatchServerHostname host</code> → <code>70.23.164.208</code><br>
+              <code>PatchServerPort port</code> → <code>12510</code><br>
+              <code>LoginHostname host</code> → <code>70.23.164.208</code><br>
+              <code>LoginPort port</code> → <code>12010</code><br>
+              <code>CommandLine args</code> → <code>-L 70.23.164.208 12010 @LOCALE_PARAMETERS</code>
+            </div>
+            <ol start="4">
+              <li>Save both files, then launch <code>Wizard101.exe</code> from your Spiral Shuffle folder. The launcher downloads game updates.</li>
+            </ol>
+            <p class="manual-note">Sign in on this website first to authorize your connection. Manual patching only changes connection settings; no patch ZIP or Install.cmd is needed.</p>
+          </details>
         </article>
       </div>
     </dialog>
