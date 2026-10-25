@@ -11,6 +11,7 @@ internal static class Program {
     private static readonly HttpClient Client = new() { BaseAddress = new Uri("http://127.0.0.1:12772"), Timeout = TimeSpan.FromSeconds(10) };
     private const string Token = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static int passed;
+    private static string? LastCode;
 
     private static void Check(bool okay, string name) {
         if (!okay) throw new Exception("FAIL: " + name);
@@ -23,6 +24,8 @@ internal static class Program {
         };
         request.Headers.Add("X-Spiral-Token", token);
         using var response = await Client.SendAsync(request);
+        var payload = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        LastCode = payload.GetProperty("code").GetString();
         return (int)response.StatusCode;
     }
     private static async Task Main() {
@@ -40,24 +43,31 @@ internal static class Program {
             Check(account.AuthLevel == AuthLevel.None && originalHash == DatabaseUtilities.CreateHashedPassword("ExamplePassword123!"), "native password hash and normal privileges");
             Check(await Enter("new_player", "ExamplePassword123!") == 200, "same credentials verify existing account");
             Check(await Enter("new_player", "WrongPassword123!") == 403, "wrong password is rejected");
+            Check(LastCode == "wrong_password", "incorrect password receives actionable reason");
             Check(account.PasswordHash == originalHash && AccountCollection.Accounts.Count == 1, "login never overwrites account or password");
             account.IsLocked = true;
+            Check(await Enter("new_player", "WrongPassword123!") == 403 && LastCode == "wrong_password", "lock status is not revealed to a wrong password");
             Check(await Enter("new_player", "ExamplePassword123!") == 403, "locked account rejected");
+            Check(LastCode == "account_locked", "correct password receives locked-account reason");
             account.IsLocked = false;
             account.InfractionHistory!.IsCurrentlyBanned = true;
             Check(await Enter("new_player", "ExamplePassword123!") == 403, "banned account rejected");
+            Check(LastCode == "account_banned", "correct password receives banned-account reason");
             account.InfractionHistory.IsCurrentlyBanned = false;
             InfractionCollection.BannedIps.Add("8.8.8.8");
             Check(await Enter("new_player", "ExamplePassword123!") == 403, "banned IP rejected for existing account");
+            Check(LastCode == "network_blocked", "blocked network receives a connection reason");
             Check(await Enter("other_player", "ExamplePassword123!") == 403 && AccountCollection.Accounts.Count == 1, "banned IP cannot auto-create account");
             InfractionCollection.BannedIps.Clear();
             Check(await Enter("new_player", "ExamplePassword123!", token: "bad") == 403, "private bridge token enforced");
             Check(await Enter("new_player", "ExamplePassword123!", ip: "not-an-address") == 400, "malformed connection address rejected");
             Check(await Enter("short_player", "short") == 400 && AccountCollection.GetAccount("short_player") == null, "short new passwords cannot create account");
+            Check(LastCode == "new_password_requirements", "short new password receives actual creation requirements");
             Check(await Enter("newline_player", "ExamplePassword123!\n") == 400, "trailing whitespace is rejected");
             DatabaseUtilities.CreateEmbeddedDatabaseAccount("old_player", "", "legacy");
             Check(await Enter("old_player", "legacy") == 200, "existing legacy password can still authenticate");
             Check(await Enter("admin", "ExamplePassword123!") == 400, "reserved usernames cannot auto-create");
+            Check(LastCode == "username_reserved", "reserved username receives actionable reason");
             Check(await Enter("new_player", "ExamplePassword123!", path: "/register") == 409, "old registration route stays create-only");
             Console.WriteLine($"{passed} bridge checks passed.");
         } finally {

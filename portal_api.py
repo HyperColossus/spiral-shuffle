@@ -32,6 +32,39 @@ RESERVED = frozenset(("admin", "administrator", "moderator", "support",
                       "system", "staff", "gamemaster"))
 
 
+BRIDGE_REJECTIONS = {
+    "username_format": (400, "Username must be 3–20 characters, start with a letter, and contain only letters, numbers or underscores."),
+    "username_reserved": (400, "That username is reserved for server staff. Choose a different username."),
+    "password_format": (400, "Passwords can contain at most 32 printable ASCII characters, with no spaces or other whitespace."),
+    "new_password_requirements": (400, "This username is new. Choose a password with 12–32 characters, without spaces. Existing accounts should use their current game password."),
+    "wrong_password": (403, "That username already exists, but the password is incorrect. Passwords are case-sensitive; check Caps Lock. To create a new account, choose a different username."),
+    "account_locked": (403, "Your password is correct, but this account is locked. Contact the server owner to restore access."),
+    "account_banned": (403, "Your password is correct, but this account is banned. Contact the server owner if you believe this is a mistake."),
+    "network_blocked": (403, "This network is blocked by the game server. Contact the server owner for help."),
+    "username_taken": (409, "That username already exists. Use its current password, or choose a different username for a new account."),
+}
+
+
+def credential_error(username: str, password: str) -> str | None:
+    if not username:
+        return "Enter a username."
+    if not 3 <= len(username) <= 20:
+        return "Username must be between 3 and 20 characters."
+    if not re.match(r"^[a-z]", username, re.ASCII):
+        return "Username must start with a letter."
+    if not USER_RULE.fullmatch(username):
+        return "Username can contain only letters, numbers and underscores."
+    if username in RESERVED:
+        return BRIDGE_REJECTIONS["username_reserved"][1]
+    if not password:
+        return "Enter your password."
+    if len(password) > 32:
+        return "Password cannot be longer than 32 characters."
+    if not LOGIN_PASS_RULE.fullmatch(password):
+        return "Password cannot contain spaces, whitespace or non-ASCII characters."
+    return None
+
+
 def local_signup_peers(value: str) -> frozenset[str]:
     """Explicit private connection peers only; never a public-IP substitution."""
     private_ranges = tuple(map(ipaddress.ip_network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
@@ -155,10 +188,22 @@ def create_game_account(settings: Settings, username: str, password: str, ip: st
                 return 200, "Game credentials verified. You can now sign in to Spiral Shuffle."
             return 503, "Registration temporarily unavailable."
     except HTTPError as exc:
+        # Translate only documented reason codes, never arbitrary bridge text,
+        # exceptions, account data or private authentication failures.
+        try:
+            detail = json.loads(exc.read(4096))
+            reason = detail.get("code") if isinstance(detail, dict) else None
+        except (ValueError, TypeError, OSError, AttributeError):
+            reason = None
+        known = BRIDGE_REJECTIONS.get(reason) if isinstance(reason, str) else None
+        if known and known[0] == exc.code:
+            return (403 if exc.code == 409 else exc.code), known[1]
+        if reason in ("bridge_forbidden", "account_unavailable"):
+            return 503, "The game account service is temporarily unavailable. Try again later."
         if exc.code in (401, 403, 409):
             return 403, "Unable to verify these game credentials. Check your username and password."
         if exc.code == 400:
-            return 400, "Please choose a different username or password."
+            return 400, "New accounts need a 12–32 character password without spaces. If this is an existing account, use its current game password."
         return 503, "Registration temporarily unavailable."
     except (URLError, TimeoutError, OSError, ValueError):
         return 503, "Game account creation is unavailable right now."
@@ -259,8 +304,9 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError, TypeError):
             self.json_reply(400, "Invalid registration data.")
             return
-        if not USER_RULE.fullmatch(username) or username in RESERVED or not LOGIN_PASS_RULE.fullmatch(password):
-            self.json_reply(400, "Use a lowercase game username (3–20 characters) and your game password. New accounts need 12–32 characters without spaces.")
+        rejection = credential_error(username, password)
+        if rejection:
+            self.json_reply(400, rejection)
             return
         try:
             allowed = check_rate_limit(ip, self.settings.ip_salt)

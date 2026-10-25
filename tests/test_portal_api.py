@@ -47,6 +47,41 @@ class RegistrationApiTests(unittest.TestCase):
                 status, _ = api.create_game_account(settings, "player_one", "ExamplePassword123!", "8.8.8.8")
                 self.assertEqual(status, expected)
 
+    def test_actionable_username_and_password_validation(self):
+        cases = [
+            ("", "valid-password", "Enter a username."),
+            ("ab", "valid-password", "between 3 and 20"),
+            ("1player", "valid-password", "start with a letter"),
+            ("my-player", "valid-password", "only letters, numbers and underscores"),
+            ("admin", "valid-password", "reserved"),
+            ("player_one", "", "Enter your password."),
+            ("player_one", "x" * 33, "longer than 32"),
+            ("player_one", "has spaces", "cannot contain spaces"),
+        ]
+        for username, password, expected in cases:
+            with self.subTest(username=username):
+                self.assertIn(expected, api.credential_error(username, password))
+        self.assertIsNone(api.credential_error("player_one", "legacy"))
+
+    def test_bridge_reason_codes_produce_safe_specific_messages(self):
+        settings = type("Fake", (), {"bridge_token": "a" * 64})()
+        for reason, (status, message) in api.BRIDGE_REJECTIONS.items():
+            body = io.BytesIO(json.dumps({"code":reason,"message":"PRIVATE INTERNAL DETAIL"}).encode())
+            with mock.patch.object(api, "urlopen", side_effect=HTTPError(api.BRIDGE_URL,status,"Error",{},body)):
+                actual, detail = api.create_game_account(settings,"player_one","ExamplePassword123!","8.8.8.8")
+            self.assertEqual(actual, 403 if status == 409 else status)
+            self.assertEqual(detail, message)
+            self.assertNotIn("PRIVATE INTERNAL DETAIL", detail)
+
+    def test_unknown_bridge_errors_do_not_expose_raw_details(self):
+        settings = type("Fake", (), {"bridge_token":"a" * 64})()
+        for code in ("bridge_forbidden", "unknown_private_error", ["wrong_password"]):
+            body=io.BytesIO(json.dumps({"code":code,"message":"PRIVATE INTERNAL DETAIL"}).encode())
+            with mock.patch.object(api,"urlopen",side_effect=HTTPError(api.BRIDGE_URL,403,"Error",{},body)):
+                status, detail=api.create_game_account(settings,"player_one","ExamplePassword123!","8.8.8.8")
+            self.assertEqual(status,503 if code == "bridge_forbidden" else 403)
+            self.assertNotIn("PRIVATE INTERNAL DETAIL",detail)
+
     def test_username_and_password_policy(self):
         self.assertTrue(api.USER_RULE.fullmatch("player_one"))
         self.assertFalse(api.USER_RULE.fullmatch("Admin"))

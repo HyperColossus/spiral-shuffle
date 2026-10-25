@@ -93,3 +93,27 @@ assert.equal(failed.requests.length, 0);
 assert.equal(failed.get('create-account').disabled, false);
 assert.match(failed.get('status').textContent, /Verification failed/);
 console.log('PASS: Continue executes verification, waits for proof, prevents duplicate submits, and recovers after expiry/error.');
+
+assert.ok(html.includes('autocomplete="on" novalidate'));
+for (const [username, password, message] of [
+  ['', 'ExamplePassword123!', 'Enter a username.'],
+  ['ab', 'ExamplePassword123!', 'between 3 and 20'],
+  ['1player', 'ExamplePassword123!', 'start with a letter'],
+  ['my-player', 'ExamplePassword123!', 'only letters, numbers and underscores'],
+  ['player_one', '', 'Enter your password.'],
+  ['player_one', 'has spaces', 'cannot contain spaces'],
+]) {
+  const invalid = page(config);
+  invalid.get('username').value = username;
+  invalid.get('password').value = password;
+  await invalid.get('signup-form').events.submit({ preventDefault() {} });
+  assert.ok(invalid.get('status').textContent.includes(message));
+  assert.equal(invalid.requests.length, 0);
+  assert.equal(invalid.executions, 0);
+}
+const normalized = page(config);
+normalized.get('username').value = 'Test_Player';
+normalized.get('password').value = 'ExamplePassword123!';
+await normalized.get('signup-form').events.submit({ preventDefault() {} });
+assert.equal(normalized.requests[0].body.username, 'test_player');
+console.log('PASS: specific field rejection messages and normalized usernames before verification.');

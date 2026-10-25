@@ -86,7 +86,7 @@ internal static class PortalRegistration {
             return;
         }
         if (!SecretMatches(request.Headers["X-Spiral-Token"], token)) {
-            await Reply(context, 403, "Forbidden.");
+            await Reply(context, 403, "Forbidden.", "bridge_forbidden");
             return;
         }
         if (request.ContentLength64 < 2 || request.ContentLength64 > 1024 ||
@@ -103,9 +103,16 @@ internal static class PortalRegistration {
         catch (JsonException) { await Reply(context, 400, "Invalid registration data."); return; }
         var username = form?.Username?.Trim().ToLowerInvariant() ?? "";
         var password = form?.Password ?? "";
-        if (!UsernameRule.IsMatch(username) || !CredentialRule.IsMatch(password) ||
-            username is "admin" or "administrator" or "moderator" or "support" or "system" or "staff" or "gamemaster") {
-            await Reply(context, 400, "Invalid username or password.");
+        if (!UsernameRule.IsMatch(username)) {
+            await Reply(context, 400, "Use 3–20 letters, digits or underscores, starting with a letter.", "username_format");
+            return;
+        }
+        if (username is "admin" or "administrator" or "moderator" or "support" or "system" or "staff" or "gamemaster") {
+            await Reply(context, 400, "That username is reserved. Choose another username.", "username_reserved");
+            return;
+        }
+        if (!CredentialRule.IsMatch(password)) {
+            await Reply(context, 400, "Enter a password of at most 32 printable characters without spaces.", "password_format");
             return;
         }
 
@@ -115,6 +122,7 @@ internal static class PortalRegistration {
             return;
         }
         int status;
+        string? reason = null;
         lock (CreationLock) {
             // Wait for the username lookup's RavenDB index rather than using a stale result.
             using var session = PlayerDatabase.Instance.Store.OpenSession();
@@ -123,19 +131,35 @@ internal static class PortalRegistration {
                 .FirstOrDefault(a => a.Username == username);
             if (enter && InfractionCollection.IsIpBanned(clientIp)) {
                 status = 403;
+                reason = "network_blocked";
             } else if (existing is not null) {
                 if (!enter) {
                     status = 409; // Compatibility for old, create-only clients.
+                    reason = "username_taken";
                 } else {
                     // Same native hash and account restrictions as game login.
                     // Never change a persisted password or create a game session.
                     var account = AccountCollection.GetAccount(username);
                     bool matches = SecretMatches(DatabaseUtilities.CreateHashedPassword(password), account?.PasswordHash);
-                    status = account is not null && matches && !account.IsLocked &&
-                        account.InfractionHistory is not null && !account.InfractionHistory.IsCurrentlyBanned ? 200 : 403;
+                    if (account is null || account.InfractionHistory is null) {
+                        status = 503;
+                        reason = "account_unavailable";
+                    } else if (!matches) {
+                        status = 403;
+                        reason = "wrong_password";
+                    } else if (account.IsLocked) {
+                        status = 403;
+                        reason = "account_locked";
+                    } else if (account.InfractionHistory.IsCurrentlyBanned) {
+                        status = 403;
+                        reason = "account_banned";
+                    } else {
+                        status = 200;
+                    }
                 }
             } else if (!PasswordRule.IsMatch(password)) {
                 status = 400;
+                reason = "new_password_requirements";
             } else {
                 status = DatabaseUtilities.CreateEmbeddedDatabaseAccount(
                     username, "", password, AuthLevel.None) is not null ? 201 : 503;
@@ -148,11 +172,11 @@ internal static class PortalRegistration {
             403 => "Unable to verify these game credentials.",
             409 => "Username unavailable.",
             _ => "Game access temporarily unavailable."
-        });
+        }, reason);
     }
 
-    private static async Task Reply(HttpListenerContext context, int status, string message) {
-        byte[] json = JsonSerializer.SerializeToUtf8Bytes(new { message });
+    private static async Task Reply(HttpListenerContext context, int status, string message, string? code = null) {
+        byte[] json = JsonSerializer.SerializeToUtf8Bytes(new { message, code });
         var response = context.Response;
         response.StatusCode = status;
         response.ContentType = "application/json; charset=utf-8";
