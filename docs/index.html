@@ -78,7 +78,7 @@
       min-height: 100dvh;
       padding: 38px 20px;
     }
-    .panel, .download-panel {
+    .panel {
       position: relative;
       width: min(100%, 500px);
       padding: clamp(28px, 5vw, 53px);
@@ -91,20 +91,23 @@
       text-align: center;
     }
     [hidden] { display: none !important; }
-    .download-panel { width: min(100%, 880px); text-align: left; }
+    .download-panel { width: min(calc(100% - 32px), 840px); max-width: none; max-height: calc(100dvh - 48px); padding: 28px 4px 4px; overflow: auto; border: 0; color: var(--white); background: transparent; text-align: left; }
+    .download-panel::backdrop { background: rgba(3, 7, 24, .12); }
+    .download-close { position: absolute; top: 0; right: 4px; padding: 0 7px; border: 0; background: transparent; color: var(--white); font: 26px/1 var(--body); cursor: pointer; }
+    .download-card { backdrop-filter: blur(32px) saturate(125%); -webkit-backdrop-filter: blur(32px) saturate(125%); box-shadow: 0 25px 75px rgba(2, 5, 17, .25); }
     .download-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
     .download-heading h2 { margin: 0; font: 600 clamp(22px, 4vw, 30px) var(--display); letter-spacing: -.045em; }
     .back-link, .download-link { color: var(--accent); font: 500 14px var(--body); text-decoration: none; }
     .back-link:hover, .download-link:hover { color: var(--mint); }
     .download-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
-    .download-card { display: flex; flex-direction: column; min-height: 270px; padding: 30px 26px; border: 1px solid var(--border); border-radius: 22px; background: rgba(11, 16, 36, .43); }
+    .download-card { display: flex; flex-direction: column; min-height: 270px; padding: 30px 26px; border: 1px solid var(--border); border-radius: 22px; background: linear-gradient(155deg, rgba(13, 16, 38, .78), rgba(6, 14, 30, .86)); }
     .download-card h3 { margin: 0 0 15px; font: 600 29px var(--display); letter-spacing: -.045em; }
     .download-card p { margin: 0 0 28px; color: var(--soft); font-size: 15px; line-height: 1.6; }
     .download-card .button { display: flex; justify-content: center; align-items: center; margin-top: auto; text-decoration: none; }
     .download-size { display: block; margin-top: 13px; text-align: center; color: var(--soft); font-size: 12px; }
     .download-note { margin: 24px 0 0; text-align: center; color: var(--soft); font-size: 13px; }
     @media (max-width: 620px) {
-      .download-panel { padding: 28px 22px; }
+      .download-panel { padding: 28px 4px 4px; }
       .download-grid { grid-template-columns: 1fr; gap: 16px; }
       .download-card { min-height: 225px; padding: 25px 23px; }
       .download-heading { align-items: flex-start; }
@@ -264,7 +267,7 @@
       <span id="copy-status" class="sr-only" aria-live="polite"></span>
       <div id="copy-toast" class="copy-toast" aria-hidden="true">Copied to clipboard</div>
 
-      <p><a class="download-link" href="#downloads">Download &amp; Install</a></p>
+      <p><a id="download-trigger" class="download-link" href="#downloads" aria-haspopup="dialog" aria-controls="downloads">Download &amp; Install</a></p>
       <form id="signup-form" autocomplete="on" novalidate>
         <label for="username" class="sr-only">Username</label>
         <input class="input" id="username" name="username" type="text"
@@ -287,11 +290,9 @@
       </form>
     </section>
 
-    <section id="downloads" class="download-panel" aria-labelledby="download-title" hidden>
-      <div class="download-heading">
-        <h2 id="download-title">Download &amp; Install</h2>
-        <a id="download-back" class="back-link" href="#account" aria-label="Back to account sign in">← Back</a>
-      </div>
+    <dialog id="downloads" class="download-panel" aria-labelledby="download-title">
+      <h2 id="download-title" class="sr-only">Download &amp; Install</h2>
+      <button id="download-close" class="download-close" type="button" aria-label="Close downloads">×</button>
       <div class="download-grid">
         <article class="download-card">
           <h3>Full Client</h3>
@@ -306,8 +307,7 @@
           <span class="download-size">Windows · 3.4 KB</span>
         </article>
       </div>
-      <p class="download-note">Extract the ZIP, open Install.cmd, then use your desktop shortcut.</p>
-    </section>
+    </dialog>
   </main>
 
   <script>
@@ -327,21 +327,23 @@
       "use strict";
       const accountPanel = document.getElementById("account-panel");
       const downloadsPanel = document.getElementById("downloads");
-      const downloadBack = document.getElementById("download-back");
-      function renderRoute(moveFocus = false) {
-        const showDownloads = window.location?.hash === "#downloads";
-        accountPanel.hidden = showDownloads;
-        downloadsPanel.hidden = !showDownloads;
-        if (moveFocus) {
-          const target = showDownloads ? downloadBack : document.getElementById("username");
-          if (target && target.focus) target.focus();
-        }
+      const downloadTrigger = document.getElementById("download-trigger");
+      function openDownloads() {
+        if (downloadsPanel.open) return;
+        downloadsPanel.showModal();
+        accountPanel.hidden = true;
       }
-      window.addEventListener?.("hashchange", () => renderRoute(true));
-      downloadsPanel.addEventListener("keydown", event => {
-        if (event.key === "Escape") window.location.hash = "account";
+      downloadTrigger.addEventListener("click", event => {
+        event.preventDefault();
+        openDownloads();
       });
-      renderRoute();
+      document.getElementById("download-close").addEventListener("click", () => downloadsPanel.close());
+      downloadsPanel.addEventListener("close", () => {
+        accountPanel.hidden = false;
+        if (downloadTrigger.focus) downloadTrigger.focus();
+      });
+      // Preserve previously shared download links without navigating on clicks.
+      if (window.location?.hash === "#downloads") openDownloads();
       const config = window.SPIRAL_SITE_CONFIG || {};
       const address = document.getElementById("server-address");
       const host = typeof config.gameHost === "string" ? config.gameHost.trim() : "";
