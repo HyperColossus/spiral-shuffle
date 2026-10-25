@@ -1,0 +1,4 @@
+[SpiralShuffleRegistered]
+title=Spiral Shuffle registered players
+description=Signup-based game access
+ports=12010,12343:12348,12510,12379/tcp

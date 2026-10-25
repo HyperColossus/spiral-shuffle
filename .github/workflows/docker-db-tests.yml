@@ -6,6 +6,11 @@ on:
       - 'docker/**'
       - 'portal_api.py'
       - 'portal_bridge.py'
+      - 'portal_access.py'
+      - 'portal/**'
+      - 'docs/index.html'
+      - 'tests/test_portal_access.py'
+      - 'tests/portal_ui.mjs'
       - 'tests/test_docker_db.py'
       - 'tests/test_portal_api.py'
       - '.github/workflows/docker-db-tests.yml'
@@ -14,6 +19,11 @@ on:
       - 'docker/**'
       - 'portal_api.py'
       - 'portal_bridge.py'
+      - 'portal_access.py'
+      - 'portal/**'
+      - 'docs/index.html'
+      - 'tests/test_portal_access.py'
+      - 'tests/portal_ui.mjs'
       - 'tests/test_docker_db.py'
       - 'tests/test_portal_api.py'
       - '.github/workflows/docker-db-tests.yml'
@@ -28,10 +38,15 @@ jobs:
         with:
           python-version: '3.12'
       - name: Python syntax checks
-        run: python3 -m py_compile docker/db_config.py portal_api.py portal_bridge.py tests/test_docker_db.py tests/test_portal_api.py
+        run: python3 -m py_compile docker/db_config.py portal_api.py portal_bridge.py portal_access.py portal/access_firewall.py tests/test_docker_db.py tests/test_portal_api.py tests/test_portal_access.py
       - name: Docker Compose validation (no container startup)
         run: docker compose -f docker/ravendb.compose.yml config --quiet
       - name: Test migration safeguards
         run: python3 -m unittest discover -s tests -p 'test_docker_db.py' -v
       - name: Test registration validation
-        run: python3 -m unittest discover -s tests -p 'test_portal_api.py' -v
+        run: python3 -m unittest discover -s tests -p 'test_portal*.py' -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test website access controls (offline DOM harness)
+        run: node tests/portal_ui.mjs

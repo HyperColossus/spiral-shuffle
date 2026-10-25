@@ -19,6 +19,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, urlopen
 
+from portal_access import AccessStore, public_ipv4
+
 ROOT = Path(__file__).resolve().parent
 PRIVATE = ROOT / ".runtime" / "portal"
 BRIDGE_URL = "http://127.0.0.1:12772/register"
@@ -32,6 +34,10 @@ RESERVED = frozenset(("admin", "administrator", "moderator", "support",
 class Settings:
     def __init__(self):
         self.public = os.getenv("SPIRAL_PORTAL_PUBLIC", "0") == "1"
+        self.access_enabled = os.getenv("SPIRAL_IP_ACCESS", "0") == "1"
+        if self.access_enabled and not self.public:
+            raise ValueError("IP access requires public mode and a trusted HTTPS proxy.")
+        self.access_store = AccessStore(PRIVATE) if self.access_enabled else None
         self.origin = os.getenv("SPIRAL_ALLOWED_ORIGIN", "https://spiral.hypercoloss.us").rstrip("/")
         url = urlsplit(self.origin)
         if (url.scheme not in ("https", "http") or not url.hostname or
@@ -144,8 +150,8 @@ class Handler(BaseHTTPRequestHandler):
         # Do not log request body, password, headers, IP or username.
         print("portal-api: request handled", flush=True)
 
-    def json_reply(self, status: int, message: str, success: bool = False):
-        payload = json.dumps({("message" if success else "error"): message}).encode("utf-8")
+    def json_reply(self, status: int, message: str, success: bool = False, **extra):
+        payload = json.dumps({("message" if success else "error"): message, **extra}).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
@@ -165,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_reply(404, "Not found.")
 
     def do_OPTIONS(self):
-        if self.path != "/register" or self.headers.get("Origin") != self.settings.origin:
+        if self.path not in ("/register", "/access/refresh") or self.headers.get("Origin") != self.settings.origin:
             self.json_reply(403, "Forbidden.")
             return
         if "content-type" not in self.headers.get("Access-Control-Request-Headers", "").lower():
@@ -191,7 +197,9 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
     def do_POST(self):
-        if self.path != "/register":
+        refresh = self.path == "/access/refresh"
+        access_enabled = getattr(self.settings, "access_enabled", False)
+        if self.path not in ("/register", "/access/refresh") or (refresh and not access_enabled):
             self.json_reply(404, "Not found.")
             return
         if self.headers.get("Origin") != self.settings.origin:
@@ -211,6 +219,12 @@ class Handler(BaseHTTPRequestHandler):
         if ip is None:
             self.json_reply(403, "Registration proxy configuration invalid.")
             return
+        if access_enabled:
+            try:
+                ip = public_ipv4(ip)
+            except ValueError:
+                self.json_reply(400, "Use a public IPv4 connection to register or refresh game access.")
+                return
         try:
             data = json.loads(self.rfile.read(size))
             if not isinstance(data, dict):
@@ -224,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError, TypeError):
             self.json_reply(400, "Invalid registration data.")
             return
-        if not USER_RULE.fullmatch(username) or username in RESERVED or not PASS_RULE.fullmatch(password):
+        if not refresh and (not USER_RULE.fullmatch(username) or username in RESERVED or not PASS_RULE.fullmatch(password)):
             self.json_reply(400, "Use a lowercase username (3–20 characters) and a unique 12–32 character password without spaces.")
             return
         try:
@@ -238,7 +252,44 @@ class Handler(BaseHTTPRequestHandler):
         if not verify_turnstile(self.settings, proof, ip):
             self.json_reply(403, "Bot verification failed. Refresh and try again.")
             return
+        if refresh:
+            try:
+                updated = self.settings.access_store.refresh(data.get("accessKey"), ip)
+            except (sqlite3.Error, OSError, ValueError):
+                self.json_reply(503, "Access updates temporarily unavailable.")
+                return
+            if not updated:
+                self.json_reply(403, "Invalid or expired access key.")
+                return
+            self.json_reply(200, "Your current IP access is queued for 30 days. Allow up to one minute, then connect to the game.", True)
+            return
+        access_key = None
+        if access_enabled:
+            try:
+                # Reserve before account creation so a storage failure cannot lose
+                # the key after creating an account. Pending rows grant no access.
+                access_key = self.settings.access_store.reserve(username, ip)
+            except (sqlite3.Error, OSError, ValueError):
+                self.json_reply(503, "Registration access storage temporarily unavailable.")
+                return
         status, message = create_game_account(self.settings, username, password)
+        if access_key:
+            if status == 201:
+                try:
+                    self.settings.access_store.activate(access_key)
+                except (sqlite3.Error, OSError):
+                    # Account creation cannot be rolled back safely. Preserve the
+                    # pending record and give the player the key for operator recovery.
+                    self.json_reply(201, "Account created, but game access needs administrator help. Save your access key.", True,
+                                    accessKey=access_key, accessPending=True)
+                    return
+                self.json_reply(201, "Account created. Save your private access key. Your current IP access is queued for 30 days; allow up to one minute before connecting.", True,
+                                accessKey=access_key)
+                return
+            try:
+                self.settings.access_store.cancel(access_key)
+            except (sqlite3.Error, OSError):
+                pass  # Pending grants are inactive and cleaned up on expiry.
         self.json_reply(status, message, success=(status == 201))
 
 

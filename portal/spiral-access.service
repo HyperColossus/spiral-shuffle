@@ -1,0 +1,16 @@
+[Unit]
+Description=Spiral Shuffle registered-player firewall sync
+After=ufw.service
+
+[Service]
+Type=oneshot
+User=root
+# EDIT owner and database path for your installation before enabling.
+ExecStart=/usr/bin/python3 -I /usr/local/lib/spiral-shuffle/access_firewall.py --owner hypercolossus --database /home/hypercolossus/spiral-shuffle/.runtime/portal/access.sqlite3
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=full
+# UFW needs to update only its own persistent rules here.
+ReadWritePaths=/etc/ufw /lib/ufw
+PrivateTmp=true
+TimeoutStartSec=120
