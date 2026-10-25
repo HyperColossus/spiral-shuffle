@@ -120,6 +120,37 @@
       -webkit-tap-highlight-color: transparent;
     }
     .ip:hover, .ip.copied { color: #fff; }
+    .copy-toast {
+      position: fixed;
+      z-index: 20;
+      max-width: calc(100vw - 32px);
+      padding: 9px 15px;
+      border: 1px solid rgba(142, 250, 227, .4);
+      border-radius: 999px;
+      background: rgba(13, 26, 38, .95);
+      color: var(--mint);
+      font: 500 13px var(--body);
+      white-space: nowrap;
+      box-shadow: 0 8px 26px rgba(0, 0, 0, .22);
+      pointer-events: none;
+      user-select: none;
+      opacity: 0;
+      transform: translate(-50%, -100%);
+    }
+    .copy-toast.show { animation: copied-float 1.5s ease-out both; }
+    @keyframes copied-float {
+      0% { opacity: 0; transform: translate(-50%, -100%) translateY(0); }
+      15% { opacity: 1; transform: translate(-50%, -100%) translateY(-8px); }
+      65% { opacity: 1; transform: translate(-50%, -100%) translateY(-25px); }
+      100% { opacity: 0; transform: translate(-50%, -100%) translateY(-58px); }
+    }
+    @keyframes copied-fade {
+      0%, 100% { opacity: 0; }
+      15%, 65% { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .copy-toast.show { animation-name: copied-fade; }
+    }
     .ip.pending {
       color: #cecae8;
       font-size: clamp(22px, 4.3vw, 31px);
@@ -211,6 +242,7 @@
 
       <button id="server-address" class="ip" type="button" aria-label="Copy server IP address" title="Click to copy">70.23.164.208</button>
       <span id="copy-status" class="sr-only" aria-live="polite"></span>
+      <div id="copy-toast" class="copy-toast" aria-hidden="true">Copied to clipboard</div>
 
       <form id="signup-form" autocomplete="on">
         <label for="username" class="sr-only">Username</label>
@@ -256,10 +288,21 @@
       if (/^[a-z0-9.-]+$/i.test(host) && host.length < 254) {
         address.textContent = host;
         const copyStatus = document.getElementById("copy-status");
+        const copyToast = document.getElementById("copy-toast");
+        function showCopied() {
+          copyStatus.textContent = "Copied to clipboard";
+          const rect = address.getBoundingClientRect();
+          copyToast.style.left = (rect.left + rect.width / 2) + "px";
+          copyToast.style.top = Math.max(rect.top - 8, 88) + "px";
+          copyToast.classList.remove("show");
+          void copyToast.offsetWidth;
+          copyToast.classList.add("show");
+        }
+
         address.addEventListener("click", async () => {
           try {
             await navigator.clipboard.writeText(host);
-            copyStatus.textContent = "IP address copied.";
+            showCopied();
             address.title = "Copied";
             address.classList.add("copied");
             setTimeout(() => {
@@ -284,7 +327,8 @@
               field.remove();
               if (previousFocus && previousFocus.focus) previousFocus.focus();
             }
-            copyStatus.textContent = copied ? "IP address copied." : "Clipboard access blocked by your browser.";
+            if (copied) showCopied();
+            else copyStatus.textContent = "Clipboard access blocked by your browser.";
           }
         });
       }
