@@ -14,6 +14,7 @@ internal sealed record DropSpellAsset(uint Original, string Name, string School,
 
 internal static class Program {
     private static readonly BindSerializer Codec = new();
+    private static readonly HashSet<string> WrittenAssets = new(StringComparer.Ordinal);
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly JsonDocumentOptions JsonReadOptions = new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip };
 
@@ -255,6 +256,15 @@ internal static class Program {
             }
 
             descriptions.Write(zip);
+            // Include Crown-priced items outside randomized equipment (mounts,
+            // housing, pets, elixirs, bundles, etc.) without changing other fields.
+            foreach (string path in archive.Files.Keys.Where(path => path.StartsWith("ObjectData/", StringComparison.Ordinal) &&
+                         path.EndsWith(".xml", StringComparison.Ordinal) && !WrittenAssets.Contains(path))) {
+                BindDocument item = ReadBinary(archive, path);
+                if (!CrownPricing.Apply(item)) continue;
+                using Stream entry = zip.CreateEntry(path, CompressionLevel.Fastest).Open();
+                entry.Write(item.Encode());
+            }
             rawManifest.Value.Set<TemplateManifest>("m_serializedTemplates", BindDocument.WriteVector(locationProperty, rawLocations));
             Write(zip, "TemplateManifest.xml", rawManifest);
         }
@@ -445,6 +455,8 @@ internal static class Program {
         BindDocument.Read(archive.OpenFile(path)!.Value.ToArray());
 
     private static void Write(ZipArchive zip, string path, BindDocument value) {
+        WrittenAssets.Add(path);
+        if (path.StartsWith("ObjectData/", StringComparison.Ordinal)) CrownPricing.Apply(value);
         byte[] bytes = value.Encode();
         if (!Codec.Deserialize(bytes, PropertyFlags.Prop_Save, out PropertyClass _)) {
             throw new InvalidDataException($"Failed round trip: {path}");
