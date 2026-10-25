@@ -26,7 +26,7 @@ PRIVATE = ROOT / ".runtime" / "portal"
 BRIDGE_URL = "http://127.0.0.1:12772/enter"
 LISTEN_ADDRESS = ("127.0.0.1", 12771)
 USER_RULE = re.compile(r"^[a-z][a-z0-9_]{2,19}$", re.ASCII)
-PASS_RULE = re.compile(r"^[!-~]{12,32}$", re.ASCII)
+PASS_RULE = re.compile(r"^[!-~]{1,32}$", re.ASCII)
 LOGIN_PASS_RULE = re.compile(r"^[!-~]{1,32}$", re.ASCII)
 RESERVED = frozenset(("admin", "administrator", "moderator", "support",
                       "system", "staff", "gamemaster"))
@@ -36,7 +36,7 @@ BRIDGE_REJECTIONS = {
     "username_format": (400, "Username must be 3–20 characters, start with a letter, and contain only letters, numbers or underscores."),
     "username_reserved": (400, "That username is reserved for server staff. Choose a different username."),
     "password_format": (400, "Passwords can contain at most 32 printable ASCII characters, with no spaces or other whitespace."),
-    "new_password_requirements": (400, "This username is new. Choose a password with 12–32 characters, without spaces. Existing accounts should use their current game password."),
+    "new_password_requirements": (400, "This username is new. Choose a password with up to 32 characters, without spaces. Existing accounts should use their current game password."),
     "wrong_password": (403, "That username already exists, but the password is incorrect. Passwords are case-sensitive; check Caps Lock. To create a new account, choose a different username."),
     "account_locked": (403, "Your password is correct, but this account is locked. Contact the server owner to restore access."),
     "account_banned": (403, "Your password is correct, but this account is banned. Contact the server owner if you believe this is a mistake."),
@@ -203,7 +203,7 @@ def create_game_account(settings: Settings, username: str, password: str, ip: st
         if exc.code in (401, 403, 409):
             return 403, "Unable to verify these game credentials. Check your username and password."
         if exc.code == 400:
-            return 400, "New accounts need a 12–32 character password without spaces. If this is an existing account, use its current game password."
+            return 400, "New accounts need a non-empty password of at most 32 characters without spaces. If this is an existing account, use its current game password."
         return 503, "Registration temporarily unavailable."
     except (URLError, TimeoutError, OSError, ValueError):
         return 503, "Game account creation is unavailable right now."

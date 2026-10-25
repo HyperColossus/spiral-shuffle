@@ -61,8 +61,9 @@ internal static class Program {
             InfractionCollection.BannedIps.Clear();
             Check(await Enter("new_player", "ExamplePassword123!", token: "bad") == 403, "private bridge token enforced");
             Check(await Enter("new_player", "ExamplePassword123!", ip: "not-an-address") == 400, "malformed connection address rejected");
-            Check(await Enter("short_player", "short") == 400 && AccountCollection.GetAccount("short_player") == null, "short new passwords cannot create account");
-            Check(LastCode == "new_password_requirements", "short new password receives actual creation requirements");
+            Check(await Enter("short_player", "1") == 201, "single-character passwords can create accounts");
+            Check(await Enter("short_player", "1") == 200, "single-character password authenticates existing account");
+            Check(await Enter("empty_player", "") == 400 && AccountCollection.GetAccount("empty_player") == null, "empty passwords cannot create accounts");
             Check(await Enter("newline_player", "ExamplePassword123!\n") == 400, "trailing whitespace is rejected");
             DatabaseUtilities.CreateEmbeddedDatabaseAccount("old_player", "", "legacy");
             Check(await Enter("old_player", "legacy") == 200, "existing legacy password can still authenticate");

@@ -75,7 +75,7 @@ To create one real test account **without writing the password to your shell his
 python3 - <<'PY'
 import getpass, json, urllib.request
 username = input("Test username (3-20 lowercase letters/digits/_): ").strip()
-password = getpass.getpass("New password (12-32 ASCII, no spaces): ")
+password = getpass.getpass("New password (non-empty ASCII, max 32, no spaces): ")
 req = urllib.request.Request(
     "http://127.0.0.1:12771/register",
     data=json.dumps({"username": username, "password": password}).encode(),
@@ -142,7 +142,7 @@ This user service starts **only the registration API**; it does not manage the g
 - **Experimental, not independently security audited.** A publicly reachable game emulator presents additional risks. Prefer an isolated VM/VPS or dedicated nonprivileged account to host public services. Back up `.runtime/saves`.
 - Ordinary users get `AuthLevel.None`; no website command can grant admin rights. Account creation is disabled if no bridge token was installed.
 - The API needs Cloudflare Turnstile for public use and validates it via Siteverify; browser-only CAPTCHA is insufficient.
-- Each signup is limited to a lowercase `[a-z][a-z0-9_]{2,19}` username and a **12–32-character ASCII** password without whitespace. Accounts may require administrator help for password recovery; this project does not collect email addresses.
+- Each signup is limited to a lowercase `[a-z][a-z0-9_]{2,19}` username and a **non-empty ASCII (at most 32 characters)** password without whitespace. Accounts may require administrator help for password recovery; this project does not collect email addresses.
 - For security, never ask players to use their official Wizard101 credentials.
 - The registration website does **not** provide or redistribute copyrighted game client files. Players need their own compatible revision and private installation.
 - Public website and public gameplay routing are separate: making the site accessible does not automatically expose game TCP ports.

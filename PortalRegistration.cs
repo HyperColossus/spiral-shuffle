@@ -22,7 +22,7 @@ internal static class PortalRegistration {
     private const string LocalPrefix = "http://127.0.0.1:12772/";
     private static readonly object CreationLock = new();
     private static readonly Regex UsernameRule = new("^[a-z][a-z0-9_]{2,19}$", RegexOptions.CultureInvariant);
-    private static readonly Regex PasswordRule = new(@"\A[!-~]{12,32}\z", RegexOptions.CultureInvariant);
+    private static readonly Regex PasswordRule = new(@"\A[!-~]{1,32}\z", RegexOptions.CultureInvariant);
     private static readonly Regex CredentialRule = new(@"\A[!-~]{1,32}\z", RegexOptions.CultureInvariant);
 
     private sealed class RegistrationRequest {
@@ -168,7 +168,7 @@ internal static class PortalRegistration {
         await Reply(context, status, status switch {
             200 => "Game credentials verified.",
             201 => "Game account created.",
-            400 => "New accounts require a 12–32 character password without spaces.",
+            400 => "New accounts require a non-empty password of at most 32 characters without spaces.",
             403 => "Unable to verify these game credentials.",
             409 => "Username unavailable.",
             _ => "Game access temporarily unavailable."

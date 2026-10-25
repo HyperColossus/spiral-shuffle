@@ -88,7 +88,9 @@ class RegistrationApiTests(unittest.TestCase):
         self.assertFalse(api.USER_RULE.fullmatch("123player"))
         self.assertFalse(api.USER_RULE.fullmatch("too_long_username_for_a_game"))
         self.assertTrue(api.PASS_RULE.fullmatch("mY-UniquePass_2026"))
-        self.assertFalse(api.PASS_RULE.fullmatch("123"))
+        self.assertTrue(api.PASS_RULE.fullmatch("1"))
+        self.assertFalse(api.PASS_RULE.fullmatch(""))
+        self.assertFalse(api.PASS_RULE.fullmatch("x" * 33))
         self.assertFalse(api.PASS_RULE.fullmatch("with spaces 123"))
         self.assertIn("admin", api.RESERVED)
 
