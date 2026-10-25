@@ -79,6 +79,7 @@
       padding: 38px 20px;
     }
     .panel {
+      position: relative;
       width: min(100%, 500px);
       padding: clamp(28px, 5vw, 53px);
       border: 1px solid var(--border);
@@ -121,28 +122,28 @@
     }
     .ip:hover, .ip.copied { color: #fff; }
     .copy-toast {
-      position: fixed;
+      position: absolute;
+      top: 0;
+      left: 50%;
       z-index: 20;
-      max-width: calc(100vw - 32px);
-      padding: 9px 15px;
-      border: 1px solid rgba(142, 250, 227, .4);
-      border-radius: 999px;
-      background: rgba(13, 26, 38, .95);
+      max-width: calc(100% - 24px);
+      padding: 0;
+      border: 0;
+      background: none;
       color: var(--mint);
       font: 500 13px var(--body);
       white-space: nowrap;
-      box-shadow: 0 8px 26px rgba(0, 0, 0, .22);
       pointer-events: none;
       user-select: none;
       opacity: 0;
-      transform: translate(-50%, -100%);
+      transform: translateX(-50%);
     }
     .copy-toast.show { animation: copied-float 1.5s ease-out both; }
     @keyframes copied-float {
-      0% { opacity: 0; transform: translate(-50%, -100%) translateY(0); }
-      15% { opacity: 1; transform: translate(-50%, -100%) translateY(-8px); }
-      65% { opacity: 1; transform: translate(-50%, -100%) translateY(-25px); }
-      100% { opacity: 0; transform: translate(-50%, -100%) translateY(-58px); }
+      0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+      15% { opacity: 1; transform: translateX(-50%) translateY(-8px); }
+      65% { opacity: 1; transform: translateX(-50%) translateY(-25px); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-58px); }
     }
     @keyframes copied-fade {
       0%, 100% { opacity: 0; }
@@ -291,9 +292,6 @@
         const copyToast = document.getElementById("copy-toast");
         function showCopied() {
           copyStatus.textContent = "Copied to clipboard";
-          const rect = address.getBoundingClientRect();
-          copyToast.style.left = (rect.left + rect.width / 2) + "px";
-          copyToast.style.top = Math.max(rect.top - 8, 88) + "px";
           copyToast.classList.remove("show");
           void copyToast.offsetWidth;
           copyToast.classList.add("show");
