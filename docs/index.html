@@ -245,7 +245,7 @@
       <span id="copy-status" class="sr-only" aria-live="polite"></span>
       <div id="copy-toast" class="copy-toast" aria-hidden="true">Copied to clipboard</div>
 
-      <form id="signup-form" autocomplete="on">
+      <form id="signup-form" autocomplete="on" novalidate>
         <label for="username" class="sr-only">Username</label>
         <input class="input" id="username" name="username" type="text"
           placeholder="Username" autocomplete="username" autocapitalize="none"
@@ -421,15 +421,19 @@
             form.addEventListener("submit", async event => {
               event.preventDefault();
               if (pending || submitting) return;
-              const username = fields[0].value.trim();
+              const username = fields[0].value.trim().toLowerCase();
               const password = fields[1].value;
               status.classList.remove("success");
-              if (!/^[a-z][a-z0-9_]{2,19}$/.test(username)) {
-                status.textContent = "Choose a lowercase username, 3–20 characters.";
-                return;
-              }
-              if (!/^[!-~]{1,32}$/.test(password)) {
-                status.textContent = "Enter your game password. New accounts need 12–32 characters without spaces.";
+              let rejection = "";
+              if (!username) rejection = "Enter a username.";
+              else if (username.length < 3 || username.length > 20) rejection = "Username must be between 3 and 20 characters.";
+              else if (!/^[a-z]/.test(username)) rejection = "Username must start with a letter.";
+              else if (!/^[a-z0-9_]+$/.test(username)) rejection = "Username can contain only letters, numbers and underscores.";
+              else if (!password) rejection = "Enter your password.";
+              else if (password.length > 32) rejection = "Password cannot be longer than 32 characters.";
+              else if (!/^[!-~]+$/.test(password)) rejection = "Password cannot contain spaces, whitespace or non-ASCII characters.";
+              if (rejection) {
+                status.textContent = rejection;
                 return;
               }
               window.turnstile.reset(widget);
