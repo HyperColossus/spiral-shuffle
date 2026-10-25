@@ -121,13 +121,10 @@
     .manual-guide summary:hover { color: var(--mint); }
     .manual-guide ol { padding-left: 19px; margin: 17px 0 0; color: var(--soft); font-size: 13px; line-height: 1.65; }
     .manual-guide li + li { margin-top: 11px; }
+    .manual-guide a { color: var(--accent); text-underline-offset: 3px; }
     .manual-guide code { color: var(--white); font-size: 12px; overflow-wrap: anywhere; }
     .manual-guide .manual-settings { margin: 14px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: rgba(3, 7, 24, .35); color: var(--soft); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
     .manual-guide .manual-note { margin: 14px 0 0; color: var(--soft); font-size: 12px; line-height: 1.6; }
-    .original-download { margin-top: 16px; text-align: center; }
-    .original-download a { color: var(--accent); font-size: 13px; text-underline-offset: 3px; }
-    .original-download a:hover { color: var(--mint); }
-    .original-download small { display: block; margin-top: 6px; color: var(--soft); font-size: 12px; line-height: 1.5; }
     .download-size { display: block; margin-top: 13px; text-align: center; color: var(--soft); font-size: 12px; }
     .download-note { margin: 24px 0 0; text-align: center; color: var(--soft); font-size: 13px; }
     @media (max-width: 620px) {
@@ -323,16 +320,12 @@
           <p>New here? Get the complete client, ready for our server.</p>
           <a class="button" href="https://register.spiral.hypercoloss.us/downloads/2026-10-25/SpiralShuffle-Full.zip">Download Full Client</a>
           <span class="download-size">Windows · 2.32 GB</span>
-          <div class="original-download">
-            <a href="https://github.com/Revive101/Imlight/releases/download/r806919.Wizard_1_610/Revive101-Setup-r806919.Wizard_1_610.-.Imlight.KALI.26Q4.42c265.exe">Original Revive101 Installer · GitHub</a>
-            <small>221 MB · Matching r806919 release.<br>Separate setup; use Manual Patch afterward to connect here.</small>
-          </div>
           <details class="manual-guide">
             <summary>Manual Install</summary>
             <div class="manual-content">
             <ol>
-              <li>Download the Full Client ZIP and choose <strong>Extract All</strong> in Windows.</li>
-              <li>Move the extracted <code>Client</code> folder to where you want the game installed. Allow at least 15 GB free for downloading and extraction.</li>
+              <li>Download and run the <a href="https://github.com/Revive101/Imlight/releases/download/r806919.Wizard_1_610/Revive101-Setup-r806919.Wizard_1_610.-.Imlight.KALI.26Q4.42c265.exe">original client installer from GitHub</a>. Complete its setup and locate the installed client folder.</li>
+              <li>Close the installed game and launcher before changing the connection settings below.</li>
               <li>In that folder, open <code>PatchClient/BankA/PatchConfig.xml</code> and <code>PatchClient/BankB/PatchConfig.xml</code> in Notepad. Set the following attributes in <strong>both files</strong>, keeping the surrounding quotes.</li>
             </ol>
             <div class="manual-settings">
