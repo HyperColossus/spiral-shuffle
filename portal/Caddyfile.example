@@ -4,7 +4,7 @@
 # The API is always bound on 127.0.0.1; do not open ports 12771 or 12772.
 
 register.example.com {
-    @register path /register /access/refresh
+    @register path /register
     handle @register {
         reverse_proxy 127.0.0.1:12771 {
             # MUST overwrite caller's X-Real-IP to keep rate limits trustworthy.

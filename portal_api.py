@@ -23,10 +23,11 @@ from portal_access import AccessStore, public_ipv4
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE = ROOT / ".runtime" / "portal"
-BRIDGE_URL = "http://127.0.0.1:12772/register"
+BRIDGE_URL = "http://127.0.0.1:12772/enter"
 LISTEN_ADDRESS = ("127.0.0.1", 12771)
 USER_RULE = re.compile(r"^[a-z][a-z0-9_]{2,19}$", re.ASCII)
 PASS_RULE = re.compile(r"^[!-~]{12,32}$", re.ASCII)
+LOGIN_PASS_RULE = re.compile(r"^[!-~]{1,32}$", re.ASCII)
 RESERVED = frozenset(("admin", "administrator", "moderator", "support",
                       "system", "staff", "gamemaster"))
 
@@ -122,8 +123,9 @@ def verify_turnstile(settings: Settings, token: str, ip: str) -> bool:
         return False
 
 
-def create_game_account(settings: Settings, username: str, password: str) -> tuple[int, str]:
-    body = json.dumps({"Username": username, "Password": password}).encode("utf-8")
+def create_game_account(settings: Settings, username: str, password: str, ip: str) -> tuple[int, str]:
+    """Create a game account or verify existing credentials using Imlight."""
+    body = json.dumps({"Username": username, "Password": password, "ClientIp": ip}).encode("utf-8")
     request = Request(
         BRIDGE_URL, data=body, method="POST",
         headers={"Content-Type": "application/json",
@@ -132,10 +134,12 @@ def create_game_account(settings: Settings, username: str, password: str) -> tup
         with urlopen(request, timeout=20) as response:
             if response.status == 201:
                 return 201, "Account created. You can now sign in to Spiral Shuffle."
+            if response.status == 200:
+                return 200, "Game credentials verified. You can now sign in to Spiral Shuffle."
             return 503, "Registration temporarily unavailable."
     except HTTPError as exc:
-        if exc.code == 409:
-            return 409, "This username is unavailable."
+        if exc.code in (401, 403, 409):
+            return 403, "Unable to verify these game credentials. Check your username and password."
         if exc.code == 400:
             return 400, "Please choose a different username or password."
         return 503, "Registration temporarily unavailable."
@@ -171,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_reply(404, "Not found.")
 
     def do_OPTIONS(self):
-        if self.path not in ("/register", "/access/refresh") or self.headers.get("Origin") != self.settings.origin:
+        if self.path != "/register" or self.headers.get("Origin") != self.settings.origin:
             self.json_reply(403, "Forbidden.")
             return
         if "content-type" not in self.headers.get("Access-Control-Request-Headers", "").lower():
@@ -197,9 +201,8 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
     def do_POST(self):
-        refresh = self.path == "/access/refresh"
         access_enabled = getattr(self.settings, "access_enabled", False)
-        if self.path not in ("/register", "/access/refresh") or (refresh and not access_enabled):
+        if self.path != "/register":
             self.json_reply(404, "Not found.")
             return
         if self.headers.get("Origin") != self.settings.origin:
@@ -238,8 +241,8 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError, TypeError):
             self.json_reply(400, "Invalid registration data.")
             return
-        if not refresh and (not USER_RULE.fullmatch(username) or username in RESERVED or not PASS_RULE.fullmatch(password)):
-            self.json_reply(400, "Use a lowercase username (3–20 characters) and a unique 12–32 character password without spaces.")
+        if not USER_RULE.fullmatch(username) or username in RESERVED or not LOGIN_PASS_RULE.fullmatch(password):
+            self.json_reply(400, "Use a lowercase game username (3–20 characters) and your game password. New accounts need 12–32 characters without spaces.")
             return
         try:
             allowed = check_rate_limit(ip, self.settings.ip_salt)
@@ -252,45 +255,31 @@ class Handler(BaseHTTPRequestHandler):
         if not verify_turnstile(self.settings, proof, ip):
             self.json_reply(403, "Bot verification failed. Refresh and try again.")
             return
-        if refresh:
-            try:
-                updated = self.settings.access_store.refresh(data.get("accessKey"), ip)
-            except (sqlite3.Error, OSError, ValueError):
-                self.json_reply(503, "Access updates temporarily unavailable.")
-                return
-            if not updated:
-                self.json_reply(403, "Invalid or expired access key.")
-                return
-            self.json_reply(200, "Your current IP access is queued for 30 days. Allow up to one minute, then connect to the game.", True)
+        try:
+            # Charge the per-account budget only after bot verification, so an
+            # unauthenticated script cannot exhaust another account's budget.
+            account_allowed = check_rate_limit("account:" + username, self.settings.ip_salt)
+        except sqlite3.Error:
+            self.json_reply(503, "Game access temporarily unavailable.")
             return
-        access_key = None
+        if not account_allowed:
+            self.json_reply(429, "Too many attempts; try again later.")
+            return
         if access_enabled:
             try:
-                # Reserve before account creation so a storage failure cannot lose
-                # the key after creating an account. Pending rows grant no access.
-                access_key = self.settings.access_store.reserve(username, ip)
+                self.settings.access_store.check_ready()
             except (sqlite3.Error, OSError, ValueError):
-                self.json_reply(503, "Registration access storage temporarily unavailable.")
+                self.json_reply(503, "Game access storage temporarily unavailable. Try again later.")
                 return
-        status, message = create_game_account(self.settings, username, password)
-        if access_key:
-            if status == 201:
-                try:
-                    self.settings.access_store.activate(access_key)
-                except (sqlite3.Error, OSError):
-                    # Account creation cannot be rolled back safely. Preserve the
-                    # pending record and give the player the key for operator recovery.
-                    self.json_reply(201, "Account created, but game access needs administrator help. Save your access key.", True,
-                                    accessKey=access_key, accessPending=True)
-                    return
-                self.json_reply(201, "Account created. Save your private access key. Your current IP access is queued for 30 days; allow up to one minute before connecting.", True,
-                                accessKey=access_key)
-                return
+        status, message = create_game_account(self.settings, username, password, ip)
+        if access_enabled and status in (200, 201):
             try:
-                self.settings.access_store.cancel(access_key)
+                self.settings.access_store.grant(username, ip)
             except (sqlite3.Error, OSError):
-                pass  # Pending grants are inactive and cleaned up on expiry.
-        self.json_reply(status, message, success=(status == 201))
+                self.json_reply(503, "Game credentials accepted, but network access could not be saved. Retry with the same username and password.")
+                return
+            message = "Game access queued. Allow up to one minute, then use this username and password in the launcher. New accounts are created automatically."
+        self.json_reply(status, message, success=(status in (200, 201)))
 
 
 def main():

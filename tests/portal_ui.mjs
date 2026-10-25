@@ -29,7 +29,7 @@ function page(config) {
   };
   const context = vm.createContext({ window, document, URL, fetch: async (url, options) => {
     requests.push({ url, body: JSON.parse(options.body) });
-    return { ok: true, json: async () => ({ message: 'Queued.', accessKey: 'a'.repeat(43) }) };
+    return { ok: true, json: async () => ({ message: 'Queued.' }) };
   }});
   vm.runInContext(scripts[0], context);
   Object.assign(window.SPIRAL_SITE_CONFIG, config);
@@ -40,27 +40,22 @@ function page(config) {
 const locked = page({});
 assert.equal(locked.widgets.length, 0);
 assert.equal(locked.get('create-account').disabled, true);
-assert.equal(locked.get('access-controls').hidden, true);
+assert.ok(!html.includes('id="access-key"'));
+assert.ok(!html.includes('id="saved-access"'));
 
 const enabled = page({ registrationApi: 'https://register.example/register',
-  turnstileSiteKey: 'example-public-site-key', ipAccessEnabled: true });
+  turnstileSiteKey: 'example-public-site-key' });
 assert.equal(enabled.widgets.length, 1);
 assert.equal(enabled.get('create-account').disabled, false);
 enabled.get('username').value = 'new_player';
 enabled.get('password').value = 'Example-Private-Password';
 await enabled.get('signup-form').events.submit({ preventDefault() {} });
-assert.equal(enabled.get('new-access-key').value, 'a'.repeat(43));
-assert.equal(enabled.get('saved-access').hidden, false);
 assert.equal(enabled.get('status').textContent, 'Queued.');
-enabled.get('access-controls').open = true;
-enabled.get('access-controls').events.toggle();
-assert.equal(enabled.widgets.length, 2);
-enabled.get('access-controls').events.toggle();
-assert.equal(enabled.widgets.length, 2);
-enabled.get('access-key').value = 'a'.repeat(43);
-await enabled.get('access-form').events.submit({ preventDefault() {} });
-assert.equal(enabled.requests[1].url, 'https://register.example/access/refresh');
-assert.deepEqual(enabled.requests[1].body, { accessKey: 'a'.repeat(43), turnstileToken: 'captcha-proof' });
-assert.equal(enabled.get('access-status').textContent, 'Queued.');
-assert.equal(enabled.get('refresh-access').disabled, false);
-console.log('PASS: disabled defaults, signup key display, lazy verification, and access refresh.');
+assert.deepEqual(enabled.requests[0].body, { username: 'new_player', password: 'Example-Private-Password', turnstileToken: 'captcha-proof' });
+// The same two fields also refresh an existing player's access.
+enabled.get('password').value = 'legacy';
+await enabled.get('signup-form').events.submit({ preventDefault() {} });
+assert.equal(enabled.requests[1].body.password, 'legacy');
+assert.equal(enabled.widgets.length, 1);
+assert.equal(enabled.get('create-account').disabled, false);
+console.log('PASS: disabled defaults and one username/password form for new and existing players; no access-key UI.');

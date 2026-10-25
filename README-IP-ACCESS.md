@@ -1,70 +1,85 @@
-# Registered-player IP access
+# Game username/password access
 
-Implementation is opt-in and has offline regression coverage. Ubuntu UFW,
-systemd and real HTTPS signup still require deployment testing. The repository
-does not enable services, open ports or turn on website signup by itself.
+Players enter a game username and password on the website and press **Continue**.
+A new username creates a normal game account automatically. Existing usernames
+require the correct game password. Either success queues the current connection's
+public IPv4 for game access for 30 days. Players use those same credentials in
+the launcher. There are no extra service accounts, access keys or recovery codes.
 
-## Flow
+Turnstile protects the request; its Managed widget usually completes without
+interaction but can require a challenge. The public homepage stays disabled until
+real HTTPS/Turnstile and external gameplay tests pass.
 
-Successful HTTPS signup -> game account in the existing Playerdata database ->
-active grant in `.runtime/portal/access.sqlite3` -> root-owned timer applies
-only the `SpiralShuffleRegistered` UFW application rules.
+## How it works
 
-The access database stores account names, public IPv4 addresses, expiry times
-and SHA-256 hashes of random 256-bit access keys. It contains no passwords.
-It is private operational data: do not commit, publish or paste it into chat.
-SQLite is separate from RavenDB; this feature never switches the game database
-or modifies existing characters or saves.
+HTTPS website -> loopback Python API -> authenticated Imlight `/enter` bridge ->
+existing Playerdata database. The bridge creates missing accounts with
+`AuthLevel.None`, or compares existing credentials using the pinned native
+`DatabaseUtilities.CreateHashedPassword` function and a constant-time comparison.
+Wrong passwords and locked/banned accounts are rejected. IP bans are also checked.
+No password is changed and no game session is created by website verification.
 
-Players receive a key once at signup. The website's **Update Game Access** form
-uses that key plus Turnstile to replace the player's previous address with the
-current connection's address. No caller-supplied IP is accepted. Keys expire
-after 90 days; network grants last 30 days after signup or refresh. Save the
-key in a password manager. The website does not persist it in browser storage.
-Lost or expired keys and existing accounts require operator assistance in this
-first version; password-based recovery and self-service key rotation are not
-implemented. The game still authenticates usernames and passwords normally.
+Only after the bridge accepts the credentials does Python write the account's
+IP grant to `.runtime/portal/access.sqlite3`. This separate private database
+contains no passwords. Its legacy column names remain for compatibility with
+installed workers; old access keys are no longer accepted by any endpoint.
+A verified return visit consolidates that account's old grants and replaces its
+address atomically. Other accounts sharing the old public IP retain their access.
 
-The browser must remain open until the returned key is saved. A lost signup
-response may require operator recovery because account creation and the local
-grant database are separate transactions. Failed/duplicate registrations never
-activate a grant. If activation fails after account creation, the response
-includes `accessPending: true` and the saved key; investigate the inactive row
-for that account rather than deleting/recreating the game account.
+The root-owned worker reads the database as the non-root game owner and manages
+only the dedicated `SpiralShuffleRegistered` UFW profile. The API has no sudo
+permission. This profile allows TCP 12010, 12343–12348, 12510 and 12379 only.
+Existing SSH, Tailscale and other manual rules remain unchanged.
 
-## Prerequisites
+## Upgrade the previously installed bridge
 
-- Complete and test the existing registration bridge and HTTPS API from
-  [README-PORTAL.md](README-PORTAL.md), using the current Playerdata database.
-- Confirm router WAN/public IPv4 routing. Forward only login TCP 12010, realm
-  TCP 12343–12348, patch TCP 12510 and patch downloads TCP 12379 to Ubuntu.
-  Update the server's advertised addresses and listeners separately; never
-  bind a process directly to a router's public IP if it is not on the host.
-- Keep UFW active with default-deny incoming. Inspect existing rules first;
-  broad public allows for these game ports bypass this allowlist. Do not reset
-  UFW or change SSH, Docker, Tailscale or unrelated service rules.
-- Keep RavenDB, API and bridge ports private. Do not forward 8090, 18080,
-  12771 or 12772.
-- First version supports public IPv4 only. Use an IPv4-reachable registration
-  hostname (A record, no AAAA), and connect from the same network as the game.
-  A VPN, browser proxy or separate browser egress can produce a different IP.
-- The example Caddy configuration assumes **direct** HTTPS ingress: Caddy
-  overwrites `X-Real-IP` with the connection peer. A CDN or tunnel requires
-  separately configured trusted-proxy handling; otherwise every signup could
-  record the proxy address. Never trust arbitrary forwarded headers.
-
-## Install the isolated firewall worker on Ubuntu
-
-These commands assume owner `hypercolossus` and checkout
-`/home/hypercolossus/spiral-shuffle`. Adjust the root-owned service's `--owner`
-and `--database` arguments if your paths differ. Inspect the files before
-installing. No game restart or asset rebuild is needed for this worker.
+On Ubuntu, while on the branch tracking `origin/codex/signup-ip-access`:
 
 ```bash
 cd ~/spiral-shuffle
+git status --short
+git pull --ff-only
 python3 -m unittest discover -s tests -p 'test_portal*.py' -v
-sudo ufw status verbose
-sudo ufw show added
+```
+
+If Git reports conflicting changes, stop; do not discard them. Stop the old
+foreground API with Ctrl+C in its own terminal, or stop its dedicated user
+service if that is how it runs. Keep the private environment and secret intact.
+
+The bridge needs a brief game restart:
+
+```bash
+python3 linux_ctl.py stop
+python3 portal_bridge.py install
+```
+
+If installation fails, run `python3 linux_ctl.py start` to restart the old server
+and inspect the compiler error. The installer restores the startup source on
+build failure. On success:
+
+```bash
+python3 linux_ctl.py start
+curl -fsS http://127.0.0.1:12772/health
+```
+
+The installer stages only the Director DLL. It does not replace the live CoreLib,
+regenerate assets, change databases or delete saves, so the game-entry fix stays
+in place. Start the updated API using its existing private environment, including
+`SPIRAL_PORTAL_PUBLIC=1` and `SPIRAL_IP_ACCESS=1`. The public proxy needs only
+`/register`; the old `/access/refresh` route now returns 404.
+
+If a credential request returns 503 after account creation, retry the same
+credentials: it will verify the existing account and retry saving the grant.
+There is no need to delete an account or save directory.
+
+## First-time firewall worker installation
+
+Review the files and current `sudo ufw status verbose` / `sudo ufw show added`.
+Require active UFW with default-deny incoming. Existing broad game-port allow
+rules bypass this allowlist; inspect those without resetting the firewall.
+For owner `hypercolossus` and checkout `/home/hypercolossus/spiral-shuffle`:
+
+```bash
 sudo install -d -o root -g root -m 0755 /usr/local/lib/spiral-shuffle
 sudo install -o root -g root -m 0644 portal/access_firewall.py /usr/local/lib/spiral-shuffle/access_firewall.py
 sudo install -o root -g root -m 0644 portal/spiral-shuffle-registered /etc/ufw/applications.d/spiral-shuffle-registered
@@ -73,76 +88,70 @@ sudo install -o root -g root -m 0644 portal/spiral-access.timer /etc/systemd/sys
 sudo systemctl daemon-reload
 ```
 
-The API has no sudo permission. A root-owned executable reads SQLite through
-an unprivileged subprocess, revalidates every address and expiry, then invokes
-UFW using fixed argument lists with no shell. Its UFW profile permits only
-the four TCP port groups above. Unexpected rules using the reserved application
-name abort synchronization; existing manual/Tailscale/SSH rules stay intact.
-Never run a root timer against Python files in a web-writable checkout.
+Adjust owner/database arguments in the root-owned service if needed. Never run
+root Python from the web-writable checkout. API startup creates the private
+access database. Run one sync before enabling the timer:
 
-## Enable and test before enabling public website signup
+```bash
+sudo systemctl start spiral-access.service
+sudo systemctl show spiral-access.service -p Result -p ExecMainStatus
+sudo journalctl -u spiral-access.service -n 10 --no-pager
+```
 
-1. Add `SPIRAL_IP_ACCESS=1` to the private `.runtime/portal/portal.env` along
-   with the tested public HTTPS/Turnstile settings (`SPIRAL_PORTAL_PUBLIC=1`).
-   Restart the API using its existing service. Both `/register` and
-   `/access/refresh` must reach the same loopback API through Caddy. Local
-   test mode deliberately refuses IP granting.
-2. API startup creates the private access database, initially empty. Start
-   and inspect a single sync before enabling the timer:
+After an empty-grant check and a controlled grant add/remove test succeed:
 
-   ```bash
-   sudo systemctl start spiral-access.service
-   sudo systemctl status spiral-access.service --no-pager
-   sudo journalctl -u spiral-access.service -n 20 --no-pager
-   ```
+```bash
+sudo systemctl enable --now spiral-access.timer
+```
 
-3. Once the service succeeds, start the timer:
+If the worker was already installed and tested, it does not need reinstalling for
+this credential-flow update. The timer runs 30 seconds after each completed sync.
+API success means **queued**, not that a firewall rule has already been applied.
 
-   ```bash
-   sudo systemctl enable --now spiral-access.timer
-   sudo systemctl list-timers spiral-access.timer --no-pager
-   ```
+## Public deployment checks
 
-4. Set `ipAccessEnabled: true` in `window.SPIRAL_SITE_CONFIG` only when the
-   worker and new API are ready. Keep registration API/site-key settings blank
-   on the public site until real HTTPS/Turnstile testing is ready. Use a private
-   staging page on the configured Turnstile hostname to test before launch.
-5. From an outside connection, register a test account, save its access key,
-   and wait for a successful timer run. Inspect `sudo ufw show added` locally:
-   only that connection's public IPv4 should receive a rule with application
-   `SpiralShuffleRegistered` and comment `spiral-signup-v1`.
-6. Confirm an unregistered outside connection cannot reach game ports and
-   the registered connection can log in and enter the world. Move to a second
-   public network and use **Update Game Access**. Confirm the old rule disappears
-   unless another active account shares that IP, and the new rule appears.
+Follow [README-PORTAL.md](README-PORTAL.md) for HTTPS and the secret environment.
+The direct Caddy example overwrites `X-Real-IP` with its connection peer. A CDN
+or tunnel needs separately validated trusted-proxy handling. Never accept a
+browser-supplied IP or arbitrary forwarded header. The registration hostname
+must be reachable by IPv4 (A record, no AAAA for this version).
 
-## Operations and limitations
+1. Confirm missing and invalid Turnstile proofs fail from an outside network.
+2. With the updated backend installed, configure the isolated test page using
+   the public site key and HTTPS API URL; leave homepage registration disabled.
+3. Submit unused credentials. Expect HTTP 201, a normal game account and an
+   active grant for the actual browser IP. No password/key appears in responses.
+4. Run the worker manually and confirm exactly that IP gains the dedicated rule.
+5. Submit the same username with a wrong password from another network. Expect
+   HTTP 403 and no grant change. Repeat with the correct password: expect HTTP
+   200, no duplicate account and replacement of that account's old IP.
+6. Verify normal game login and world entry from that network, plus refusal of
+   an unregistered outside connection. Public game routing/advertised addresses
+   must already be set correctly; website registration alone does not do that.
 
-The timer runs 30 seconds after each completed sync. Access is queued, not
-confirmed by the API; normal updates take about a minute at small scale.
-Monitor failures with `journalctl -u spiral-access.service`. On a read or
-validation failure, the worker preserves existing rules and exits unsuccessfully;
-expired rules are therefore not removed until the worker is healthy again.
-UFW changes are incremental; a command failure can leave partial progress and
-the next successful run reconciles it. Existing TCP sessions may outlive rule
-removal because UFW tracks established connections; revocation controls new
-connections and does not log an account out of the game.
+## Limits and rollback
 
-Access is per public IP, so people sharing a home or carrier NAT share network
-reachability. IP access supplements account authentication. It is not identity
-verification or DDoS protection. Changing an IP revokes it only when no active
-grant needs it, and manually allowed addresses remain manually allowed.
+IP grants last 30 days. Re-entering valid game credentials renews access. New
+passwords require 12–32 printable ASCII characters without spaces; existing
+1–32 character printable passwords can still be verified. IP and account attempt
+budgets are 5/hour and 15/day; account attempts count after valid bot verification.
+Game username/password checks still decide who may actually play. People behind
+the same public NAT share network reachability. IP access is not DDoS protection.
 
-For a lost key or an existing game account, verify ownership privately before
-issuing a replacement through `portal_access.AccessStore`. Do not provide a
-public endpoint that accepts only a username. To revoke an account's grants,
-set `active = 0` for its username in the private access database as the game
-owner, then run a sync; no RavenDB data needs to change.
+A worker failure preserves existing rules, including expired ones until a
+successful reconciliation. Existing TCP sessions may survive rule removal.
+Check `journalctl -u spiral-access.service` for worker failures. Incremental UFW
+updates recover on the next successful run. Do not delete the access database
+or profile before withdrawing its rules.
 
-To pause updates, stop `spiral-access.timer`; this leaves existing rules intact.
-To withdraw all signup grants, deactivate rows in the private access database,
-run a successful sync, then stop the timer and disable the API feature.
-Do not delete the access database or application profile before cleanup.
-Keep the API and worker versions updated together. Rules are reconstructed
-from `ufw show added` rather than rule numbers, so interrupted runs can recover.
-Never use `ufw reset`, flush unrelated rules or delete database volumes.
+To revoke an account's network grants, set `active = 0` for its username in the
+private access database as the game owner and run a sync. If the account must
+remain barred from reauthorizing, lock/ban it in the game database as well.
+To withdraw all grants, deactivate all rows, run a successful sync, then stop
+the timer and disable the API feature. Stopping the timer alone keeps rules.
+Never reset UFW, flush unrelated rules, switch Playerdata or delete volumes.
+
+Offline coverage includes Python HTTP/storage tests, a DOM/fetch/Turnstile UI
+harness, and compiled tests of the real bridge source with in-memory persistence
+and a pinned upstream hashing fixture. Real RavenDB behavior, the installed
+Director build and end-to-end external connectivity require deployment tests.

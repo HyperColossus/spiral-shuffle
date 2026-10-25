@@ -12,7 +12,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import portal_api as api
-from portal_access import AccessStore, KEY_SECONDS, LEASE_SECONDS, public_ipv4
+from portal_access import AccessStore, LEASE_SECONDS, public_ipv4
 
 spec = importlib.util.spec_from_file_location("access_firewall", Path(__file__).resolve().parents[1] / "portal/access_firewall.py")
 fw = importlib.util.module_from_spec(spec)
@@ -25,24 +25,24 @@ class GrantTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.store = AccessStore(Path(self.temp.name))
 
-    def test_pending_signup_cannot_refresh_and_key_is_only_hashed(self):
-        key = self.store.reserve("new_player", "8.8.8.8", now=1000)
-        self.assertNotIn(key.encode(), self.store.path.read_bytes())
-        self.assertFalse(self.store.refresh(key, "1.1.1.1", now=1001))
-        self.store.cancel(key)
+    def test_grant_replaces_ip_and_extends_expiry_without_access_keys(self):
+        self.store.grant("new_player", "8.8.8.8", now=1000)
+        self.store.grant("new_player", "1.1.1.1", now=2000)
         with self.store.connect() as db:
-            self.assertEqual(db.execute("SELECT count(*) FROM access_grants").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT username, ip, expires, active FROM access_grants").fetchall(),
+                             [("new_player", "1.1.1.1", 2000 + LEASE_SECONDS, 1)])
+        self.assertFalse(hasattr(self.store, "refresh"))
 
-    def test_refresh_replaces_previous_ip_and_expired_key_is_rejected(self):
-        key = self.store.reserve("new_player", "8.8.8.8", now=1000)
-        self.store.activate(key)
-        self.assertTrue(self.store.refresh(key, "1.1.1.1", now=2000))
+    def test_legacy_schema_and_other_accounts_are_preserved(self):
         with self.store.connect() as db:
-            self.assertEqual(db.execute("SELECT ip, expires FROM access_grants").fetchall(),
-                             [("1.1.1.1", 2000 + LEASE_SECONDS)])
-        self.assertFalse(self.store.refresh(key, "9.9.9.9", now=1000 + KEY_SECONDS))
-        self.assertFalse(self.store.refresh("x" * 43, "9.9.9.9", now=2000))
-        self.assertFalse(self.store.refresh(None, "9.9.9.9", now=2000))
+            db.execute("INSERT INTO access_grants VALUES (?, ?, ?, ?, ?, ?)",
+                       ("old-key-hash", "new_player", "8.8.8.8", 10000, 10000, 1))
+        self.store.grant("other_player", "8.8.8.8", now=1000)
+        self.store.grant("new_player", "1.1.1.1", now=2000)
+        with self.store.connect() as db:
+            rows=db.execute("SELECT username, ip FROM access_grants ORDER BY username").fetchall()
+            self.assertEqual(rows, [("new_player", "1.1.1.1"), ("other_player", "8.8.8.8")])
+            self.assertEqual(db.execute("SELECT count(*) FROM access_grants WHERE key_hash = ?", ("old-key-hash",)).fetchone()[0], 0)
 
     def test_nonpublic_and_nonipv4_addresses_never_create_grants(self):
         for value in ("127.0.0.1", "192.168.1.1", "100.96.206.48", "224.0.0.1", "255.255.255.255", "::1", "2606:4700:4700::1111", "0.0.0.0/0", "8.8.8.8; reboot"):
@@ -56,11 +56,9 @@ class GrantTests(unittest.TestCase):
                 fw.desired_ips(rows, 100)
 
     def test_shared_address_remains_until_last_grant_moves(self):
-        first = self.store.reserve("first_player", "8.8.8.8", now=1000)
-        second = self.store.reserve("second_player", "8.8.8.8", now=1000)
-        self.store.activate(first)
-        self.store.activate(second)
-        self.store.refresh(first, "1.1.1.1", now=1001)
+        self.store.grant("first_player", "8.8.8.8", now=1000)
+        self.store.grant("second_player", "8.8.8.8", now=1000)
+        self.store.grant("first_player", "1.1.1.1", now=1001)
         with self.store.connect() as db:
             rows = [list(row) for row in db.execute("SELECT ip, expires FROM access_grants WHERE active = 1")]
         self.assertEqual(fw.desired_ips(rows, 1001), {"8.8.8.8", "1.1.1.1"})
@@ -148,18 +146,20 @@ class AccessHttpTests(unittest.TestCase):
     def signup(self):
         return self.post("/register", dict(username="new_player", password="Example-Private-Password", turnstileToken="proof"))
 
-    def test_signup_then_refresh_uses_proxy_ip_not_body_and_never_returns_password(self):
+    def test_create_or_verify_credentials_uses_same_form_and_proxy_ip(self):
         status, result = self.signup()
         self.assertEqual(status, 201)
-        key = result["accessKey"]
         self.assertNotIn("password", result)
-        status, _ = self.post("/access/refresh", {"accessKey": key, "ip": "9.9.9.9", "turnstileToken": "proof"}, ip="1.1.1.1")
+        self.assertNotIn("accessKey", result)
+        self.create_game_account.return_value = (200, "Verified.")
+        status, _ = self.post("/register", {"username":"new_player", "password":"Example-Private-Password", "ip":"9.9.9.9", "turnstileToken":"proof"}, ip="1.1.1.1")
         self.assertEqual(status, 200)
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT ip, active FROM access_grants").fetchall(), [("1.1.1.1", 1)])
+        self.create_game_account.assert_called_with(api.Handler.settings, "new_player", "Example-Private-Password", "1.1.1.1")
 
-    def test_failed_or_duplicate_signup_never_activates_grant(self):
-        for code in (409, 503):
+    def test_wrong_password_or_backend_failure_cannot_grant(self):
+        for code in (403, 503):
             self.create_game_account.return_value = (code, "Unavailable.")
             self.assertEqual(self.signup()[0], code)
         with self.store.connect() as db:
@@ -167,7 +167,7 @@ class AccessHttpTests(unittest.TestCase):
 
     def test_wrong_origin_missing_proxy_captcha_and_rate_limit_cannot_grant(self):
         self.assertEqual(self.post("/register", {}, ip=None)[0], 403)
-        self.assertEqual(self.post("/access/refresh", {}, origin="https://evil.example")[0], 403)
+        self.assertEqual(self.post("/register", {}, origin="https://evil.example")[0], 403)
         self.verify_turnstile.return_value = False
         self.assertEqual(self.signup()[0], 403)
         self.verify_turnstile.return_value = True
@@ -176,28 +176,45 @@ class AccessHttpTests(unittest.TestCase):
         self.create_game_account.assert_not_called()
 
     def test_storage_failure_does_not_create_account(self):
-        with mock.patch.object(self.store, "reserve", side_effect=sqlite3.OperationalError):
+        with mock.patch.object(self.store, "check_ready", side_effect=sqlite3.OperationalError):
             self.assertEqual(self.signup()[0], 503)
         self.create_game_account.assert_not_called()
 
-    def test_activation_failure_returns_recovery_key_but_no_active_grant(self):
-        with mock.patch.object(self.store, "activate", side_effect=sqlite3.OperationalError):
+    def test_save_failure_can_be_retried_with_existing_credentials(self):
+        with mock.patch.object(self.store, "grant", side_effect=sqlite3.OperationalError):
             status, result = self.signup()
-        self.assertEqual(status, 201)
-        self.assertTrue(result["accessPending"])
-        self.assertFalse(self.store.refresh(result["accessKey"], "1.1.1.1"))
+        self.assertEqual(status, 503)
+        self.assertNotIn("accessKey", result)
+        self.create_game_account.return_value=(200, "Verified.")
+        self.assertEqual(self.signup()[0], 200)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM access_grants WHERE active = 1").fetchone()[0], 1)
 
-    def test_invalid_refresh_key_and_disabled_feature(self):
-        self.assertEqual(self.post("/access/refresh", {"accessKey": "bad"})[0], 403)
-        api.Handler.settings.access_enabled = False
-        self.assertEqual(self.post("/access/refresh", {})[0], 404)
+    def test_legacy_access_keys_are_not_accepted(self):
+        self.assertEqual(self.post("/access/refresh", {"accessKey":"x"*43})[0], 404)
+        self.assertEqual(self.post("/register", {"accessKey":"x"*43})[0], 400)
+        self.create_game_account.assert_not_called()
 
-    def test_refresh_needs_captcha_and_ignores_spoofed_source_body(self):
-        key = self.signup()[1]["accessKey"]
-        self.verify_turnstile.return_value = False
-        self.assertEqual(self.post("/access/refresh", {"accessKey": key}, ip="1.1.1.1")[0], 403)
+    def test_refresh_requires_correct_credentials_and_captcha(self):
+        self.signup()
+        self.create_game_account.return_value=(403, "Wrong password.")
+        self.assertEqual(self.post("/register", {"username":"new_player", "password":"wrong-password", "turnstileToken":"proof"}, ip="1.1.1.1")[0], 403)
+        self.verify_turnstile.return_value=False
+        self.check_rate_limit.reset_mock()
+        self.assertEqual(self.signup()[0], 403)
+        self.check_rate_limit.assert_called_once_with("8.8.8.8", "test")
         with self.store.connect() as db:
             self.assertEqual(db.execute("SELECT ip FROM access_grants").fetchone()[0], "8.8.8.8")
+
+    def test_existing_short_password_is_forwarded_for_native_verification(self):
+        self.create_game_account.return_value=(200, "Verified.")
+        status, _ = self.post("/register", {"username":"old_player", "password":"legacy", "turnstileToken":"proof"})
+        self.assertEqual(status, 200)
+
+    def test_account_attempt_budget_is_enforced_after_captcha(self):
+        self.check_rate_limit.side_effect=[True, False]
+        self.assertEqual(self.signup()[0], 429)
+        self.create_game_account.assert_not_called()
 
 
 if __name__ == "__main__":

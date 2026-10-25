@@ -6,6 +6,9 @@ The **website stays on GitHub Pages** at https://spiral.hypercoloss.us/ . This a
 
 Optional signup-based firewall access is documented in [README-IP-ACCESS.md](README-IP-ACCESS.md).
 It is disabled by default. Enable it only after the HTTPS API and separate firewall worker are tested.
+Players use one game username/password form: new usernames create normal accounts;
+existing usernames must verify the existing password before updating IP access.
+No additional service account or player access key is required.
 
 **Docker RavenDB database:** To start with new empty accounts (the selected option), use the **Fresh installation** instructions in [docker/README.md](docker/README.md). To preserve existing characters, use the separate import procedure instead. Complete the appropriate database switch **before installing the registration bridge**. The website and Imlight must use the same `Playerdata` database. Do not point the public website at RavenDB.
 
@@ -84,7 +87,7 @@ with urllib.request.urlopen(req, timeout=30) as response:
 PY
 ```
 
-A response of **201** means Imlight reports account creation. Log into the game with those same credentials to verify end-to-end behavior. Only share response codes and errors; do not paste credentials into chat.
+A response of **201** means Imlight reports account creation; **200** means an existing account's credentials were verified. The private bridge uses `/enter` for this combined flow. Wrong existing passwords return 403 and never change an IP grant or persisted password. Log into the game with those same credentials to verify end-to-end behavior. Only share response codes and errors; do not paste credentials into chat.
 
 ## C. Set up public HTTPS (after the local test works)
 
