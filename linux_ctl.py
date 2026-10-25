@@ -46,6 +46,18 @@ def configured_game_ip() -> str:
     raise ValueError(f"GameServerIP is missing from {config}")
 
 
+def configured_patch_binding() -> tuple[str, str]:
+    """Separate the local patch listener from the address advertised to players."""
+    bind_ip = os.environ.get("SPIRAL_PATCH_BIND_IP", "").strip()
+    if not bind_ip:
+        bind_ip = configured_game_ip()
+    address = ipaddress.ip_address(bind_ip)
+    if address.version != 4:
+        raise ValueError("Patch listener requires an IPv4 address")
+    bind_ip = str(address)
+    return bind_ip, "127.0.0.1" if address.is_unspecified else bind_ip
+
+
 def owned_process(which: str) -> int | None:
     """Check PID plus exact executable argument to avoid killing another process."""
     pidfile = _pid_path(which)
@@ -126,10 +138,10 @@ def start() -> int:
     settings = json.loads(cfg.read_text())
     python = settings.get("python", sys.executable)
     dotnet = settings.get("dotnet", "dotnet")
-    game_ip = configured_game_ip()
-    patch_pid = spawn("patch", [python, _expected_argument("patch"), "--host", game_ip, "--port", "12379"], ROOT)
+    patch_bind_ip, patch_health_host = configured_patch_binding()
+    patch_pid = spawn("patch", [python, _expected_argument("patch"), "--host", patch_bind_ip, "--port", "12379"], ROOT)
     try:
-        url = f"http://{game_ip}:12379/{REVISION}/LatestFileList.bin"
+        url = f"http://{patch_health_host}:12379/{REVISION}/LatestFileList.bin"
         # host.py serves only patch assets on the configured game interface.
         for _ in range(30):
             if not owned_process("patch"):
