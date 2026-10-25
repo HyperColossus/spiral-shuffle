@@ -32,10 +32,25 @@ RESERVED = frozenset(("admin", "administrator", "moderator", "support",
                       "system", "staff", "gamemaster"))
 
 
+def local_signup_peers(value: str) -> frozenset[str]:
+    """Explicit private connection peers only; never a public-IP substitution."""
+    private_ranges = tuple(map(ipaddress.ip_network, ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")))
+    peers = set()
+    for item in value.split(","):
+        if not item.strip():
+            continue
+        address = ipaddress.ip_address(item.strip())
+        if address.version != 4 or not any(address in network for network in private_ranges):
+            raise ValueError("SPIRAL_LOCAL_SIGNUP_PEERS requires exact private LAN IPv4 addresses.")
+        peers.add(str(address))
+    return frozenset(peers)
+
+
 class Settings:
     def __init__(self):
         self.public = os.getenv("SPIRAL_PORTAL_PUBLIC", "0") == "1"
         self.access_enabled = os.getenv("SPIRAL_IP_ACCESS", "0") == "1"
+        self.local_signup_peers = local_signup_peers(os.getenv("SPIRAL_LOCAL_SIGNUP_PEERS", ""))
         if self.access_enabled and not self.public:
             raise ValueError("IP access requires public mode and a trusted HTTPS proxy.")
         self.access_store = AccessStore(PRIVATE) if self.access_enabled else None
@@ -99,16 +114,18 @@ def check_rate_limit(ip: str, salt: str, now: int | None = None) -> bool:
         connection.close()
 
 
-def verify_turnstile(settings: Settings, token: str, ip: str) -> bool:
+def verify_turnstile(settings: Settings, token: str, ip: str | None) -> bool:
     if not settings.public:
         return True
     if not token or len(token) > 2048:
         return False
-    payload = urlencode({
+    fields = {
         "secret": settings.turnstile_secret,
         "response": token,
-        "remoteip": ip,
-    }).encode("utf-8")
+    }
+    if ip is not None:
+        fields["remoteip"] = ip
+    payload = urlencode(fields).encode("utf-8")
     request = Request(
         "https://challenges.cloudflare.com/turnstile/v0/siteverify",
         data=payload, method="POST",
@@ -222,7 +239,8 @@ class Handler(BaseHTTPRequestHandler):
         if ip is None:
             self.json_reply(403, "Registration proxy configuration invalid.")
             return
-        if access_enabled:
+        local_peer = access_enabled and ip in getattr(self.settings, "local_signup_peers", frozenset())
+        if access_enabled and not local_peer:
             try:
                 ip = public_ipv4(ip)
             except ValueError:
@@ -252,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
         if not allowed:
             self.json_reply(429, "Too many attempts; try again later.")
             return
-        if not verify_turnstile(self.settings, proof, ip):
+        if not verify_turnstile(self.settings, proof, None if local_peer else ip):
             self.json_reply(403, "Bot verification failed. Refresh and try again.")
             return
         try:
@@ -265,14 +283,19 @@ class Handler(BaseHTTPRequestHandler):
         if not account_allowed:
             self.json_reply(429, "Too many attempts; try again later.")
             return
-        if access_enabled:
+        if access_enabled and not local_peer:
             try:
                 self.settings.access_store.check_ready()
             except (sqlite3.Error, OSError, ValueError):
                 self.json_reply(503, "Game access storage temporarily unavailable. Try again later.")
                 return
         status, message = create_game_account(self.settings, username, password, ip)
-        if access_enabled and status in (200, 201):
+        if local_peer and status in (200, 201):
+            # Private peers still require CAPTCHA and native game credentials.
+            # Never insert a router/private address into the public allowlist or
+            # overwrite an existing public grant for this account.
+            message = "Game credentials accepted. Use these credentials in the launcher."
+        elif access_enabled and status in (200, 201):
             try:
                 self.settings.access_store.grant(username, ip)
             except (sqlite3.Error, OSError):

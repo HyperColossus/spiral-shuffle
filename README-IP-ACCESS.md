@@ -155,3 +155,27 @@ Offline coverage includes Python HTTP/storage tests, a DOM/fetch/Turnstile UI
 harness, and compiled tests of the real bridge source with in-memory persistence
 and a pinned upstream hashing fixture. Real RavenDB behavior, the installed
 Director build and end-to-end external connectivity require deployment tests.
+
+## Signing in from the server's home network
+
+Some routers rewrite hairpin requests to a private router address. For this
+installation, the direct Caddy connection check reported `192.168.86.0` from
+the owner's home connection, while outside friends had public IPv4 peers.
+If needed, explicitly add this to the private portal environment:
+
+```ini
+SPIRAL_LOCAL_SIGNUP_PEERS=192.168.86.0
+```
+
+Restart only the Python API after updating it. This permits account creation or
+native password verification from that exact observed private peer; CAPTCHA,
+rate limits and game-account lock/ban checks still apply. No public-IP grant is
+written, no public address is guessed and any existing public grant for that
+account is preserved. Turnstile's optional remote-IP field is omitted for this
+case. Home gameplay must continue using an already permitted LAN/Tailscale
+route; this setting does not add or widen game firewall rules.
+
+The default is empty. Only exact RFC1918 IPv4 addresses are accepted, not
+subnets, public addresses, loopback or caller-supplied body fields. This depends
+on the loopback-only API and Caddy overwriting `X-Real-IP` from its connection
+peer. Do not add CDN/proxy addresses here to bypass client-IP configuration.

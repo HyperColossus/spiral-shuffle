@@ -216,6 +216,39 @@ class AccessHttpTests(unittest.TestCase):
         self.assertEqual(self.signup()[0], 429)
         self.create_game_account.assert_not_called()
 
+    def test_configured_home_peer_verifies_credentials_without_public_grant(self):
+        api.Handler.settings.local_signup_peers = api.local_signup_peers("192.168.86.0")
+        self.store.grant("new_player", "8.8.8.8")
+        for code in (200, 201):
+            self.create_game_account.return_value = (code, "Accepted.")
+            status, _ = self.post("/register", {"username":"new_player", "password":"Example-Private-Password", "turnstileToken":"proof"}, ip="192.168.86.0")
+            self.assertEqual(status, code)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT ip FROM access_grants").fetchall(), [("8.8.8.8",)])
+        self.verify_turnstile.assert_called_with(api.Handler.settings, "proof", None)
+
+    def test_home_peer_still_requires_password_and_captcha(self):
+        api.Handler.settings.local_signup_peers = api.local_signup_peers("192.168.86.0")
+        body={"username":"new_player", "password":"wrong-password", "turnstileToken":"proof"}
+        self.create_game_account.return_value=(403, "Wrong password.")
+        self.assertEqual(self.post("/register", body, ip="192.168.86.0")[0], 403)
+        self.verify_turnstile.return_value=False
+        self.create_game_account.reset_mock()
+        self.assertEqual(self.post("/register", body, ip="192.168.86.0")[0], 403)
+        self.create_game_account.assert_not_called()
+
+    def test_unconfigured_private_peers_and_body_overrides_still_fail(self):
+        api.Handler.settings.local_signup_peers = api.local_signup_peers("192.168.86.0")
+        body={"username":"new_player", "password":"Example-Private-Password", "ip":"192.168.86.0", "turnstileToken":"proof"}
+        self.assertEqual(self.post("/register", body, ip="192.168.1.2")[0], 400)
+        self.create_game_account.assert_not_called()
+
+    def test_home_peer_configuration_cannot_include_public_addresses_or_ranges(self):
+        self.assertEqual(api.local_signup_peers(""), frozenset())
+        for value in ("8.8.8.8", "0.0.0.0/0", "192.168.0.0/16", "::1", "127.0.0.1"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                api.local_signup_peers(value)
+
 
 if __name__ == "__main__":
     unittest.main()

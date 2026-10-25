@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import io
 import os
 from pathlib import Path
 import tempfile
@@ -10,11 +11,23 @@ import unittest
 from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from urllib.parse import parse_qs
 
 import portal_api as api
 
 
 class RegistrationApiTests(unittest.TestCase):
+    def test_turnstile_stays_enforced_when_home_peer_omits_optional_remoteip(self):
+        settings = type("Fake", (), {"public":True, "turnstile_secret":"test-secret", "host":"spiral.hypercoloss.us"})()
+        for ip in (None, "8.8.8.8"):
+            body=json.dumps({"success":True,"hostname":"spiral.hypercoloss.us","action":"register"}).encode()
+            with mock.patch.object(api, "urlopen", return_value=io.BytesIO(body)) as verify:
+                self.assertTrue(api.verify_turnstile(settings, "proof", ip))
+                payload=parse_qs(verify.call_args.args[0].data.decode())
+                self.assertEqual(payload["response"], ["proof"])
+                self.assertEqual(payload.get("remoteip"), [ip] if ip else None)
+        self.assertFalse(api.verify_turnstile(settings, "", None))
+
     def test_bridge_client_accepts_created_and_verified_accounts(self):
         settings = type("Fake", (), {"bridge_token": "a" * 64})()
         for status in (200, 201):
