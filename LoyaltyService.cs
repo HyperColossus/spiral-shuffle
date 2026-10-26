@@ -32,6 +32,30 @@ internal sealed class LoyaltyService(SessionActor sessionActor) : MessageService
         SendToSocket(new WIZARD3_56_PROTOCOL.MSG_LOYALTYCLAIMLOYALTYTOKENSCONFIRM());
     }
 
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_LOCK_REQUEST))]
+    private void ReceiveLoyaltyPurchaseLock(WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_LOCK_REQUEST message) {
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_LOCK_RESPONSE {
+            Item = message.Item,
+            LoyaltyTokensCost = 1,
+            Error = 0
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_REQUEST))]
+    private void ReceiveLoyaltyPurchase(WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_REQUEST message) {
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_LOYALTYSTORE_PURCHASE_RESPONSE {
+            Item = message.Item,
+            Type = 1,
+            LoyaltyTokensCost = message.LoyaltyTokensCost,
+            Error = 0
+        });
+    }
+
+    [MessageHandler(typeof(GAME2_55_PROTOCOL.MSG_REQUESTEXPLICITLOYALTYSTOREUPDATE))]
+    private void ReceiveRequestExplicitLoyaltyStoreUpdate(GAME2_55_PROTOCOL.MSG_REQUESTEXPLICITLOYALTYSTOREUPDATE message) {
+        SendToSocket(message);
+    }
+
     [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTCROWNSREWARDSEVENTS))]
     private void ReceiveRequestCrownsRewardsEvents(WIZARD2_53_PROTOCOL.MSG_REQUESTCROWNSREWARDSEVENTS message) {
         SendToSocket(new WIZARD2_53_PROTOCOL.MSG_ADDCROWNSREWARDSEVENT());

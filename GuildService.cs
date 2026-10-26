@@ -110,4 +110,39 @@ internal sealed class GuildService(SessionActor sessionActor) : MessageService(s
             State = 1
         });
     }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDOPENHOUSE))]
+    private void ReceiveGuildOpenHouse(WIZARD3_56_PROTOCOL.MSG_GUILDOPENHOUSE message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDOPENHOUSEENDS))]
+    private void ReceiveGuildOpenHouseEnds(WIZARD3_56_PROTOCOL.MSG_GUILDOPENHOUSEENDS message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDMESSAGE))]
+    private void ReceiveGuildMessage(WIZARD3_56_PROTOCOL.MSG_GUILDMESSAGE message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDVISITORREQUEST))]
+    private void ReceiveGuildVisitorRequest(WIZARD3_56_PROTOCOL.MSG_GUILDVISITORREQUEST message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDMEMBERSHIP))]
+    private void ReceiveGuildMembership(WIZARD3_56_PROTOCOL.MSG_GUILDMEMBERSHIP message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GRANTGUILDBADGE))]
+    private void ReceiveGrantGuildBadge(WIZARD3_56_PROTOCOL.MSG_GRANTGUILDBADGE message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_EMPTYGUILDTRASH))]
+    private void ReceiveEmptyGuildTrash(WIZARD3_56_PROTOCOL.MSG_EMPTYGUILDTRASH message) {
+        SendToSocket(message);
+    }
 }

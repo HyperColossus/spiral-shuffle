@@ -52,4 +52,40 @@ internal sealed class PvPTournamentService(SessionActor sessionActor) : MessageS
     private void ReceivePvPStatueInspect(WIZARD3_56_PROTOCOL.MSG_PvPStatueInspect message) {
         SendToSocket(message);
     }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PVP5THAGECANJOINMATCH))]
+    private void ReceivePvP5thAgeCanJoinMatch(WIZARD3_56_PROTOCOL.MSG_PVP5THAGECANJOINMATCH message) {
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_PVP5THAGECANJOINMATCHRESPONSE {
+            CanJoinQueue = 1
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PVP5THAGEOPENPVPWINDOW))]
+    private void ReceivePvP5thAgeOpenPvPWindow(WIZARD3_56_PROTOCOL.MSG_PVP5THAGEOPENPVPWINDOW message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_AdvPvPLeaderboardDataRequest))]
+    private void ReceiveAdvPvPLeaderboardDataRequest(WIZARD3_56_PROTOCOL.MSG_AdvPvPLeaderboardDataRequest message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_AdvPvPLeaderboardData {
+            LeagueID = message.LeagueID,
+            SeasonID = message.SeasonID,
+            StartTime = message.StartTime,
+            PlayerGID = wizard.GameObjectID,
+            EntryList = "Leaderboard: Top Ranked Duelists"
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_EXPANDPVPSEARCH))]
+    private void ReceiveExpandPvPSearch(WIZARD_12_PROTOCOL.MSG_EXPANDPVPSEARCH message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_ALLOWLEAVEPVP))]
+    private void ReceiveAllowLeavePvP(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_ALLOWLEAVEPVP message) {
+        SendToSocket(message);
+    }
 }

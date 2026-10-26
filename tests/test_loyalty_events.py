@@ -17,6 +17,9 @@ class LoyaltyEventsTests(unittest.TestCase):
         self.assertIn("MSG_LOYALTYCLAIMLOYALTYTOKENSCONFIRM", svc)
         self.assertIn("MSG_REQUESTCROWNSREWARDSEVENTS", svc)
         self.assertIn("MSG_ADDCROWNSREWARDSEVENT", svc)
+        self.assertIn("MSG_LOYALTYSTORE_PURCHASE_LOCK_REQUEST", svc)
+        self.assertIn("MSG_LOYALTYSTORE_PURCHASE_REQUEST", svc)
+        self.assertIn("MSG_REQUESTEXPLICITLOYALTYSTOREUPDATE", svc)
 
     def test_whirlyburly_kiosk(self):
         svc = (SOURCE / "Game/Services/LoyaltyService.cs").read_text(encoding="utf-8")

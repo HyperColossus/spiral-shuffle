@@ -21,6 +21,13 @@ class GuildsTests(unittest.TestCase):
         self.assertIn("MSG_REQUESTGUILDINVENTORY", svc)
         self.assertIn("MSG_REQUESTGUILDACHIEVEMENTS", svc)
         self.assertIn("MSG_REQUESTGUILDMUSEUMDOOR", svc)
+        self.assertIn("MSG_GUILDOPENHOUSE", svc)
+        self.assertIn("MSG_GUILDOPENHOUSEENDS", svc)
+        self.assertIn("MSG_GUILDMESSAGE", svc)
+        self.assertIn("MSG_GUILDVISITORREQUEST", svc)
+        self.assertIn("MSG_GUILDMEMBERSHIP", svc)
+        self.assertIn("MSG_GRANTGUILDBADGE", svc)
+        self.assertIn("MSG_EMPTYGUILDTRASH", svc)
 
 if __name__ == "__main__":
     unittest.main()

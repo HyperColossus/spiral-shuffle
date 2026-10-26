@@ -1142,6 +1142,17 @@ def main() -> None:
     shutil.copy2(ROOT / "ChatChannelService.cs", SOURCE / "Game/Services/ChatChannelService.cs")
     shutil.copy2(ROOT / "FishMarketService.cs", SOURCE / "Game/Services/FishMarketService.cs")
     shutil.copy2(ROOT / "SorceryStonesService.cs", SOURCE / "Game/Services/SorceryStonesService.cs")
+    shutil.copy2(ROOT / "SecondChanceChestService.cs", SOURCE / "Game/Services/SecondChanceChestService.cs")
+    shutil.copy2(ROOT / "HenchmanService.cs", SOURCE / "Game/Services/HenchmanService.cs")
+    shutil.copy2(ROOT / "GauntletService.cs", SOURCE / "Game/Services/GauntletService.cs")
+    shutil.copy2(ROOT / "ScrollOfFortuneService.cs", SOURCE / "Game/Services/ScrollOfFortuneService.cs")
+    shutil.copy2(ROOT / "BeastmoonService.cs", SOURCE / "Game/Services/BeastmoonService.cs")
+    shutil.copy2(ROOT / "GiftRedemptionService.cs", SOURCE / "Game/Services/GiftRedemptionService.cs")
+    shutil.copy2(ROOT / "MinigameRewardService.cs", SOURCE / "Game/Services/MinigameRewardService.cs")
+    shutil.copy2(ROOT / "DailyPvPService.cs", SOURCE / "Game/Services/DailyPvPService.cs")
+    shutil.copy2(ROOT / "AccessPassService.cs", SOURCE / "Game/Services/AccessPassService.cs")
+    shutil.copy2(ROOT / "PixiePostService.cs", SOURCE / "Game/Services/PixiePostService.cs")
+    shutil.copy2(ROOT / "PetProgressionService.cs", SOURCE / "Game/Services/PetProgressionService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1452,7 +1463,18 @@ def main() -> None:
         typeof(CastleGameService),
         typeof(ChatChannelService),
         typeof(FishMarketService),
-        typeof(SorceryStonesService),""")
+        typeof(SorceryStonesService),
+        typeof(SecondChanceChestService),
+        typeof(HenchmanService),
+        typeof(GauntletService),
+        typeof(ScrollOfFortuneService),
+        typeof(BeastmoonService),
+        typeof(GiftRedemptionService),
+        typeof(MinigameRewardService),
+        typeof(DailyPvPService),
+        typeof(AccessPassService),
+        typeof(PixiePostService),
+        typeof(PetProgressionService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }

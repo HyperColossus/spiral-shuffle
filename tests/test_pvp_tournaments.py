@@ -15,6 +15,13 @@ class PvPTournamentTests(unittest.TestCase):
         self.assertIn("MSG_PVP5THAGEKIOSKREQUEST", svc)
         self.assertIn("MSG_AdvPvPEloData", svc)
         self.assertIn("MSG_PvPStatueInspect", svc)
+        self.assertIn("MSG_PVP5THAGECANJOINMATCH", svc)
+        self.assertIn("MSG_PVP5THAGECANJOINMATCHRESPONSE", svc)
+        self.assertIn("MSG_PVP5THAGEOPENPVPWINDOW", svc)
+        self.assertIn("MSG_AdvPvPLeaderboardDataRequest", svc)
+        self.assertIn("MSG_AdvPvPLeaderboardData", svc)
+        self.assertIn("MSG_EXPANDPVPSEARCH", svc)
+        self.assertIn("MSG_ALLOWLEAVEPVP", svc)
 
 if __name__ == "__main__":
     unittest.main()
