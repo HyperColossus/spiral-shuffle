@@ -1252,6 +1252,12 @@ def main() -> None:
     shutil.copy2(ROOT / "CinematicAndInteractiveAudioService.cs", SOURCE / "Game/Services/CinematicAndInteractiveAudioService.cs")
     shutil.copy2(ROOT / "PlayerWaypointAndReadinessService.cs", SOURCE / "Game/Services/PlayerWaypointAndReadinessService.cs")
     shutil.copy2(ROOT / "QuestTurnInAndBankQuickSellService.cs", SOURCE / "Game/Services/QuestTurnInAndBankQuickSellService.cs")
+    shutil.copy2(ROOT / "RateMyStitchHolidayService.cs", SOURCE / "Game/Services/RateMyStitchHolidayService.cs")
+    shutil.copy2(ROOT / "HatchmakingFriendPetQueryService.cs", SOURCE / "Game/Services/HatchmakingFriendPetQueryService.cs")
+    shutil.copy2(ROOT / "FriendlyPlayerQuestHelpService.cs", SOURCE / "Game/Services/FriendlyPlayerQuestHelpService.cs")
+    shutil.copy2(ROOT / "HousingArtifactAndRentalService.cs", SOURCE / "Game/Services/HousingArtifactAndRentalService.cs")
+    shutil.copy2(ROOT / "AdventureCatchAndMailService.cs", SOURCE / "Game/Services/AdventureCatchAndMailService.cs")
+    shutil.copy2(ROOT / "TrainingPointRespecAndRestoreService.cs", SOURCE / "Game/Services/TrainingPointRespecAndRestoreService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1677,7 +1683,13 @@ def main() -> None:
         typeof(HousingPlacementAndPhysicsService),
         typeof(CinematicAndInteractiveAudioService),
         typeof(PlayerWaypointAndReadinessService),
-        typeof(QuestTurnInAndBankQuickSellService),""")
+        typeof(QuestTurnInAndBankQuickSellService),
+        typeof(RateMyStitchHolidayService),
+        typeof(HatchmakingFriendPetQueryService),
+        typeof(FriendlyPlayerQuestHelpService),
+        typeof(HousingArtifactAndRentalService),
+        typeof(AdventureCatchAndMailService),
+        typeof(TrainingPointRespecAndRestoreService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
