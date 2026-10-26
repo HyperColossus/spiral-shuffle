@@ -21,5 +21,15 @@ class AdventurePartyTests(unittest.TestCase):
         self.assertIn("MSG_USEPETADVENTUREPOWER", svc)
         self.assertIn("MSG_UPDATEADVENTUREPOWERCOOLDOWN", svc)
 
+
+    def test_party_kiosk_and_management(self):
+        svc = (SOURCE / "Game/Services/AdventurePartyService.cs").read_text(encoding="utf-8")
+        self.assertIn("MSG_ADVENTUREPARTYADDTOKIOSK", svc)
+        self.assertIn("MSG_ADVENTUREPARTYASKTOJOIN", svc)
+        self.assertIn("MSG_CHANGEPARTYNAME", svc)
+        self.assertIn("MSG_CHANGEPARTYOWNER", svc)
+        self.assertIn("MSG_REQUESTLEAVEADVENTUREPARTY", svc)
+        self.assertIn("MSG_LEAVEADVENTUREPARTY", svc)
+
 if __name__ == "__main__":
     unittest.main()

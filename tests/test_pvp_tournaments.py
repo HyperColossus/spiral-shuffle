@@ -22,6 +22,9 @@ class PvPTournamentTests(unittest.TestCase):
         self.assertIn("MSG_AdvPvPLeaderboardData", svc)
         self.assertIn("MSG_EXPANDPVPSEARCH", svc)
         self.assertIn("MSG_ALLOWLEAVEPVP", svc)
+        self.assertIn("MSG_PVPCONFIRMHOSTTOURNEY", svc)
+        self.assertIn("MSG_PVPCONSUMECROWNSTOHOSTTOURNEY", svc)
+        self.assertIn("MSG_HOSTTOURNEYCONFIRM", svc)
 
 if __name__ == "__main__":
     unittest.main()

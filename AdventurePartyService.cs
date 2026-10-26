@@ -63,4 +63,39 @@ internal sealed class AdventurePartyService(SessionActor sessionActor) : Message
     private void ReceiveSetPurpose(WIZARD3_56_PROTOCOL.MSG_ADVENTUREPARTSETPURPOSE message) {
         SendToSocket(message);
     }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_ADVENTUREPARTYADDTOKIOSK))]
+    private void ReceiveAddToKiosk(WIZARD3_56_PROTOCOL.MSG_ADVENTUREPARTYADDTOKIOSK message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_ADVENTUREPARTYASKTOJOIN))]
+    private void ReceiveAskToJoin(WIZARD3_56_PROTOCOL.MSG_ADVENTUREPARTYASKTOJOIN message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_CHANGEPARTYNAME))]
+    private void ReceiveChangePartyName(WIZARD3_56_PROTOCOL.MSG_CHANGEPARTYNAME message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_CHANGEPARTYOWNER))]
+    private void ReceiveChangePartyOwner(WIZARD3_56_PROTOCOL.MSG_CHANGEPARTYOWNER message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_REQUESTLEAVEADVENTUREPARTY))]
+    private void ReceiveRequestLeaveAdventureParty(WIZARD_12_PROTOCOL.MSG_REQUESTLEAVEADVENTUREPARTY message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_LEAVEADVENTUREPARTY {
+            PlayerGID = wizard.GameObjectID,
+            PlayerName = wizard.PlayerNameBehavior.GetWizardNameAsByteHexString(),
+            PartyName = message.PartyName,
+            PartyNameLocale = message.PartyNameLocale,
+            Status = 0,
+            Guild = message.Guild
+        });
+    }
 }

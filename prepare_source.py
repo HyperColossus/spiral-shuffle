@@ -1153,6 +1153,10 @@ def main() -> None:
     shutil.copy2(ROOT / "AccessPassService.cs", SOURCE / "Game/Services/AccessPassService.cs")
     shutil.copy2(ROOT / "PixiePostService.cs", SOURCE / "Game/Services/PixiePostService.cs")
     shutil.copy2(ROOT / "PetProgressionService.cs", SOURCE / "Game/Services/PetProgressionService.cs")
+    shutil.copy2(ROOT / "MannequinService.cs", SOURCE / "Game/Services/MannequinService.cs")
+    shutil.copy2(ROOT / "BattleBookService.cs", SOURCE / "Game/Services/BattleBookService.cs")
+    shutil.copy2(ROOT / "TreasureCardPosterService.cs", SOURCE / "Game/Services/TreasureCardPosterService.cs")
+    shutil.copy2(ROOT / "HousingCraftingStationService.cs", SOURCE / "Game/Services/HousingCraftingStationService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1474,7 +1478,11 @@ def main() -> None:
         typeof(DailyPvPService),
         typeof(AccessPassService),
         typeof(PixiePostService),
-        typeof(PetProgressionService),""")
+        typeof(PetProgressionService),
+        typeof(MannequinService),
+        typeof(BattleBookService),
+        typeof(TreasureCardPosterService),
+        typeof(HousingCraftingStationService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }

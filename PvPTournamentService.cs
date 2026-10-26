@@ -88,4 +88,38 @@ internal sealed class PvPTournamentService(SessionActor sessionActor) : MessageS
     private void ReceiveAllowLeavePvP(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_ALLOWLEAVEPVP message) {
         SendToSocket(message);
     }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PVPCONFIRMHOSTTOURNEY))]
+    private void ReceivePvPConfirmHostTourney(WIZARD3_56_PROTOCOL.MSG_PVPCONFIRMHOSTTOURNEY message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_PVPCONFIRMHOSTTOURNEY {
+            CharacterID = wizard.CharId,
+            HostingRequestID = message.HostingRequestID,
+            HostingCrownsCost = 100,
+            TotalCrowns = wizard.Account.Crowns,
+            WebFailure = 0,
+            Failure = 0
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PVPCONSUMECROWNSTOHOSTTOURNEY))]
+    private void ReceivePvPConsumeCrownsToHostTourney(WIZARD3_56_PROTOCOL.MSG_PVPCONSUMECROWNSTOHOSTTOURNEY message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        const int HostCost = 100;
+        if (wizard.Account.Crowns >= HostCost) {
+            wizard.Account.SetCrowns(wizard.Account.Crowns - HostCost);
+        }
+
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_HOSTTOURNEYCONFIRM {
+            CharacterID = wizard.CharId,
+            CreatedTourneyBracketID = 101,
+            Success = 1,
+            Credits = wizard.Account.Crowns,
+            WebFailure = 0
+        });
+    }
 }
