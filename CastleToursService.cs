@@ -52,4 +52,96 @@ internal sealed class CastleToursService(SessionActor sessionActor) : MessageSer
             Status = 0
         });
     }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTLEADERBOARD))]
+    private void ReceiveRequestLeaderboard(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTLEADERBOARD message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTLEADERBOARD {
+            LeaderboardType = message.LeaderboardType,
+            SortType = message.SortType,
+            PageNumber = message.PageNumber,
+            LeaderboardData = ByteString.Empty
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTNEXTLEADERBOARD))]
+    private void ReceiveRequestNextLeaderboard(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTNEXTLEADERBOARD message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTNEXTLEADERBOARD {
+            LeaderboardType = message.LeaderboardType,
+            ClusterGID = message.ClusterGID,
+            OwnerGID = message.OwnerGID
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLES))]
+    private void ReceiveRequestMyCastles(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLES message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLES {
+            GlobalID = wizard.GameObjectID,
+            Data = ByteString.Empty,
+            Days = 30
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLEDATA))]
+    private void ReceiveRequestMyCastleData(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLEDATA message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTMYCASTLEDATA {
+            GlobalID = wizard.GameObjectID,
+            Data = ByteString.Empty
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTFRIENDS))]
+    private void ReceiveRequestFriends(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTFRIENDS message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREQUESTFRIENDS {
+            CharacterID = wizard.CharId,
+            Data = ByteString.Empty
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADD))]
+    private void ReceiveCastleToursAdd(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADD message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADDRESULT {
+            Status = 0
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREMOVE))]
+    private void ReceiveCastleToursRemove(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREMOVE message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADDRESULT {
+            Status = 0
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSPOSTRATEHOUSE))]
+    private void ReceivePostRateHouse(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSPOSTRATEHOUSE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSPOSTRATEHOUSE {
+            CharacterID = wizard.CharId,
+            BadgeCredit = 1,
+            MaxBadgeCredit = 10
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADDFAVORITE))]
+    private void ReceiveAddFavorite(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADDFAVORITE message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSADDFAVORITE {
+            GlobalID = message.GlobalID,
+            Success = 1
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREMOVEFAVORITE))]
+    private void ReceiveRemoveFavorite(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLETOURSREMOVEFAVORITE message) {
+        SendToSocket(message);
+    }
 }

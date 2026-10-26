@@ -10,6 +10,7 @@
 
 using System;
 using Akka.Actor;
+using Imcodec.IO;
 using Imcodec.MessageLayer.Generated;
 using Imlight.Common;
 using Imlight.CoreLib.Shared.Networking;
@@ -93,5 +94,74 @@ internal sealed class TeamUpService(SessionActor sessionActor) : MessageService(
             PlayerCount = 1,
             Level = (uint) wizard.MagicSchoolBehavior.Level
         });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPINFO))]
+    private void ReceiveRequestTeamHelpInfo(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPINFO message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPINFO {
+            WorldInfo = ByteString.Empty,
+            SigilInfo = ByteString.Empty
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPJOIN))]
+    private void ReceiveRequestTeamHelpJoin(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPJOIN message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPJOIN {
+            SigilID = message.SigilID,
+            PlayerGID = wizard.GameObjectID,
+            SchoolID = message.SchoolID,
+            WorldID = message.WorldID,
+            Level = wizard.MagicSchoolBehavior.Level,
+            ClientPlatform = message.ClientPlatform
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPWORLDINFO))]
+    private void ReceiveRequestTeamHelpWorldInfo(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPWORLDINFO message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPWORLDINFO {
+            WorldID = message.WorldID,
+            WorldSigilInfo = ByteString.Empty,
+            PlayerGID = wizard.GameObjectID,
+            ClientPlatform = message.ClientPlatform
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_CLIENTREQUESTTEAMHELPWORLDINFO))]
+    private void ReceiveClientRequestTeamHelpWorldInfo(WIZARD2_53_PROTOCOL.MSG_CLIENTREQUESTTEAMHELPWORLDINFO message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_CLIENTREQUESTTEAMHELPWORLDINFO {
+            WorldID = message.WorldID,
+            ClientPlatform = message.ClientPlatform
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_TEAMUPADDPLAYER))]
+    private void ReceiveTeamUpAddPlayer(WIZARD2_53_PROTOCOL.MSG_TEAMUPADDPLAYER message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_TEAMUPADDPLAYER {
+            PlayerGID = wizard.GameObjectID,
+            SigilID = message.SigilID,
+            SchoolID = message.SchoolID,
+            IsFarming = message.IsFarming,
+            RequestedSigilMode = message.RequestedSigilMode,
+            TeamSize = message.TeamSize,
+            UseHighestPlayerLevel = message.UseHighestPlayerLevel,
+            Level = (uint) wizard.MagicSchoolBehavior.Level,
+            MinimumLevel = message.MinimumLevel,
+            MaximumLevel = message.MaximumLevel,
+            ClientPlatform = message.ClientPlatform
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPFAIL))]
+    private void ReceiveRequestTeamHelpFail(WIZARD2_53_PROTOCOL.MSG_REQUESTTEAMHELPFAIL message) {
+        SendToSocket(message);
     }
 }

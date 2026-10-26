@@ -1157,6 +1157,12 @@ def main() -> None:
     shutil.copy2(ROOT / "BattleBookService.cs", SOURCE / "Game/Services/BattleBookService.cs")
     shutil.copy2(ROOT / "TreasureCardPosterService.cs", SOURCE / "Game/Services/TreasureCardPosterService.cs")
     shutil.copy2(ROOT / "HousingCraftingStationService.cs", SOURCE / "Game/Services/HousingCraftingStationService.cs")
+    shutil.copy2(ROOT / "HatchmakingService.cs", SOURCE / "Game/Services/HatchmakingService.cs")
+    shutil.copy2(ROOT / "HousingVaultService.cs", SOURCE / "Game/Services/HousingVaultService.cs")
+    shutil.copy2(ROOT / "CharacterIdentityService.cs", SOURCE / "Game/Services/CharacterIdentityService.cs")
+    shutil.copy2(ROOT / "ItemLockService.cs", SOURCE / "Game/Services/ItemLockService.cs")
+    shutil.copy2(ROOT / "PackOddsService.cs", SOURCE / "Game/Services/PackOddsService.cs")
+    shutil.copy2(ROOT / "CastleMagicAndSignsService.cs", SOURCE / "Game/Services/CastleMagicAndSignsService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1487,7 +1493,13 @@ def main() -> None:
         typeof(MannequinService),
         typeof(BattleBookService),
         typeof(TreasureCardPosterService),
-        typeof(HousingCraftingStationService),""")
+        typeof(HousingCraftingStationService),
+        typeof(HatchmakingService),
+        typeof(HousingVaultService),
+        typeof(CharacterIdentityService),
+        typeof(ItemLockService),
+        typeof(PackOddsService),
+        typeof(CastleMagicAndSignsService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
