@@ -253,6 +253,292 @@ def patch_director_crown_shop() -> None:
     program.write_text(text.replace(before, after), encoding="utf-8")
 
 
+
+def patch_dorm_and_zones() -> None:
+    replace("Game/Services/ZoneService.cs",
+            """        var tpmsg = new ZONE_102_PROTOCOL.MSG_ZONETRANSFER {
+            DestinationZone = "WizardCity/QA_SpawnRate", // just teleporting to gm for now
+            DestinationLocation = "Start",
+            SendToClient = true,
+            OwnerCharId = wizard.CharId,
+        };""",
+            """        var tpmsg = new ZONE_102_PROTOCOL.MSG_ZONETRANSFER {
+            DestinationZone = "WizardCity/Interiors/WC_Housing_Dorm_Interior",
+            DestinationLocation = "29.88838,3.523079,0,-1.586301",
+            SendToClient = true,
+            OwnerCharId = wizard.CharId,
+            IsPrivate = true,
+        };""")
+    replace("Game/World/AccessPassManager.cs",
+            """    internal static bool DoesZoneExist(string zoneName)
+        => s_zones.Any(zone => zone.Equals(zoneName, System.StringComparison.OrdinalIgnoreCase));""",
+            """    internal static bool DoesZoneExist(string zoneName)
+        => s_zones.Any(zone => zone.Equals(zoneName, System.StringComparison.OrdinalIgnoreCase))
+           || Imlight.CoreLib.WizardData.Collections.ZoneDataCollection.GetZoneData(zoneName) is not null;""")
+    replace("Shared/Resources/LocalWadCache.cs",
+            """        if (file is null) {\n            Logger.Warning("LocalCache does not contain a file definition for {FileName}!", \n                Logger.Args(wadName));\n\n            return null;\n        }""",
+            """        if (file is null) {
+            var diskPath = ResolveDiskWadPath(wadName);
+            if (diskPath is not null && File.Exists(diskPath)) {
+                try {
+                    using var stream = File.OpenRead(diskPath);
+                    var memStream = new MemoryStream();
+                    stream.CopyTo(memStream);
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    return ArchiveParser.Parse(memStream);
+                }
+                catch (Exception ex) {
+                    Logger.Error("Failed to parse wad {FileName} from disk {Path}: {Error}", Logger.Args(wadName, diskPath, ex.Message));
+                }
+            }
+
+            Logger.Warning("LocalCache does not contain a file definition for {FileName}!",
+                Logger.Args(wadName));
+
+            return null;
+        }""")
+    replace("Shared/Resources/LocalWadCache.cs",
+            """    private static uint GetWadCrc(Archive wad) {""",
+            """    private static string ResolveDiskWadPath(string wadName) {
+        var setting = ConfigurationManager.Settings["Patch Server.GameDataPath"]?.AsString();
+        if (!string.IsNullOrEmpty(setting)) {
+            var p = Path.Combine(setting, $"{wadName}.wad");
+            if (File.Exists(p)) return p;
+        }
+        string[] candidates = [
+            "/home/hypercolossus/Revive101/Aurorium/data/V_r806919.Wizard_1_610/Data/GameData",
+            "GameData",
+            "../../Data/GameData",
+            "../Data/GameData",
+            "Data/GameData"
+        ];
+        foreach (var dir in candidates) {
+            var fullDir = Path.IsPathRooted(dir) ? dir : Path.GetFullPath(dir);
+            var p = Path.Combine(fullDir, $"{wadName}.wad");
+            if (File.Exists(p)) return p;
+        }
+        return null;
+    }
+
+    private static uint GetWadCrc(Archive wad) {""")
+
+
+def patch_bank_system() -> None:
+    replace("WizardData/Models/Player/Account.cs",
+            """    public int PurchasedCharacterSlots { get; set; }
+    public int Crowns { get; set; } = 50000;""",
+            """    public int PurchasedCharacterSlots { get; set; }
+    public int Crowns { get; set; } = 50000;
+    public List<ulong> SharedBankItemIds { get; set; } = new();
+    [System.Text.Json.Serialization.JsonIgnore] public List<Imcodec.ObjectProperty.TypeCache.WizClientObjectItem> SharedBankItems { get; set; } = new();""")
+
+    replace("WizardData/Collections/AccountCollection.cs",
+            """using Raven.Client.Documents;""",
+            """using Raven.Client.Documents;\nusing Imcodec.ObjectProperty.TypeCache;""")
+
+    replace("WizardData/Collections/AccountCollection.cs",
+            """        var infractions = session.Query<Infraction>(collectionName: InfractionCollection.CollectionName)
+            .Where(i => i.AccountId == account.AccountId)
+            .ToList();""",
+            """        var infractions = session.Query<Infraction>(collectionName: InfractionCollection.CollectionName)
+            .Where(i => i.AccountId == account.AccountId)
+            .ToList();
+
+        if (account.SharedBankItemIds?.Count > 0) {
+            account.SharedBankItems = session.Query<WizClientObjectItem>(collectionName: WizardItemCollection.CollectionName)
+                .Where(x => account.SharedBankItemIds.Contains(x.m_globalID))
+                .ToList();
+        } else {
+            account.SharedBankItems = new();
+        }""")
+
+    replace("WizardData/Collections/AccountCollection.cs",
+            """    public static bool UpdateCrowns(ulong accountId, int crownsAmount) {
+        return UpdateAccount(accountId, account => {
+            account.Crowns = crownsAmount;
+        });
+    }""",
+            """    public static bool UpdateCrowns(ulong accountId, int crownsAmount) {
+        return UpdateAccount(accountId, account => {
+            account.Crowns = crownsAmount;
+        });
+    }
+
+    public static bool UpdateSharedBank(ulong accountId, System.Collections.Generic.List<ulong> itemIds) {
+        return UpdateAccount(accountId, account => {
+            account.SharedBankItemIds = [.. itemIds];
+        });
+    }""")
+
+    replace("WizardData/Models/Player/Wizard.cs",
+            """    public ServerWizInventoryBehavior InventoryBehavior { get; set; }""",
+            """    public ServerWizInventoryBehavior InventoryBehavior { get; set; }
+    public List<ulong> BankItemIds { get; set; } = new();
+    public int BankLimit { get; set; } = 100;
+    [System.Text.Json.Serialization.JsonIgnore] public List<Imcodec.ObjectProperty.TypeCache.WizClientObjectItem> BankItems { get; set; } = new();""")
+
+    replace("WizardData/Collections/WizardCollection.cs",
+            """        wizard.InventoryBehavior.Items = [.. items
+            .Where(i => wizard.InventoryBehavior.InventoryItemIds
+            .Contains(i.m_globalID))
+        ];""",
+            """        wizard.InventoryBehavior.Items = [.. items
+            .Where(i => wizard.InventoryBehavior.InventoryItemIds
+            .Contains(i.m_globalID))
+        ];
+
+        wizard.BankItems = [.. items
+            .Where(i => wizard.BankItemIds != null && wizard.BankItemIds.Contains(i.m_globalID))
+        ];""")
+
+    replace("WizardData/Collections/WizardItemCollection.cs",
+            """using Imcodec.ObjectProperty.TypeCache;""",
+            """using Imcodec.ObjectProperty.TypeCache;\nusing Imcodec.Types;""")
+
+    replace("WizardData/Collections/WizardItemCollection.cs",
+            """    public static bool DeleteInventory(ulong playerID) {""",
+            """    public static bool UpdateItemCharacter(ulong itemId, ulong charId) {
+        using var session = s_store.OpenSession();
+        var item = session.Query<WizClientObjectItem>(collectionName: CollectionName)
+            .FirstOrDefault(x => x.m_globalID == itemId);
+        if (item is null) return false;
+        item.m_characterId = (GID) charId;
+        session.SaveChanges();
+        return true;
+    }
+
+    public static bool DeleteInventory(ulong playerID) {""")
+
+
+def patch_pet_feeding() -> None:
+    replace("Game/Services/InventoryService.cs",
+            """using System;
+using Akka.Actor;""",
+            """using System;
+using System.Linq;
+using Akka.Actor;""")
+
+    old_feed = """    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM))]
+    private void ReceiveFeedInventoryItem(GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM message) {
+        SendToSocket(new GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM() {
+            FedObjectID = message.FedObjectID,
+            PetID = message.PetID,
+        });
+    }"""
+
+    new_feed = """    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM))]
+    private void ReceiveFeedInventoryItem(GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var pet = wizard.InventoryBehavior?.Items?.FirstOrDefault(i => i.m_globalID == message.PetID)
+            ?? wizard.EquipmentBehavior?.EquippedItems?.FirstOrDefault(i => i.m_globalID == message.PetID);
+        var petBehavior = pet?.m_inactiveBehaviors?.OfType<ClientPetItemBehavior>().FirstOrDefault();
+
+        var snack = wizard.PetSnackBehavior?.Snacks?.FirstOrDefault(s => s.m_globalID == message.FedObjectID);
+        if (snack != null) {
+            var snackTemplate = CoreObjectFactory.GetCoreTemplate(snack.m_templateID) as PetSnackItemTemplate;
+            int xpGain = 0;
+            if (snackTemplate?.m_statModifierSet?.m_modifications != null) {
+                foreach (var mod in snackTemplate.m_statModifierSet.m_modifications) {
+                    if (mod.m_change > 0) xpGain += mod.m_change;
+                }
+            }
+            if (xpGain <= 0) xpGain = 1;
+
+            var petTemplate = CoreObjectFactory.GetCoreTemplate(pet?.m_templateID ?? 0);
+            var petItemBeh = petTemplate?.m_behaviors?.OfType<PetItemBehaviorTemplate>().FirstOrDefault();
+
+            wizard.RemoveSnack(snack.m_globalID, out _);
+            SendToSocket(new PET_9_PROTOCOL.MSG_PETSNACKREMOVE {
+                GlobalID = wizard.GameObjectID,
+                ItemID = snack.m_globalID
+            });
+
+            if (petBehavior != null && pet != null) {
+                petBehavior.m_XP += (uint) xpGain;
+
+                uint[] req = [0, 125, 250, 500, 1000, 2000, 2000];
+                int currentLevel = Math.Clamp((int) petBehavior.m_level, 1, 6);
+                uint needed = currentLevel < req.Length ? req[currentLevel] : 2000;
+
+                if (petBehavior.m_XP >= needed && petBehavior.m_level < 6) {
+                    petBehavior.m_XP -= needed;
+                    petBehavior.m_level++;
+
+                    petBehavior.m_expressedTalents ??= [];
+                    petBehavior.m_expressedDerbyTalents ??= [];
+                    uint newTalent = 0;
+                    uint newDerby = 0;
+
+                    if (petBehavior.m_allTalents != null) {
+                        var candidate = petBehavior.m_allTalents.FirstOrDefault(t => !petBehavior.m_expressedTalents.Contains(t));
+                        if (candidate != 0) {
+                            petBehavior.m_expressedTalents.Add(candidate);
+                            newTalent = candidate;
+                        }
+                    }
+                    if (petBehavior.m_allDerbyTalents != null) {
+                        var candidate = petBehavior.m_allDerbyTalents.FirstOrDefault(d => !petBehavior.m_expressedDerbyTalents.Contains(d));
+                        if (candidate != 0) {
+                            petBehavior.m_expressedDerbyTalents.Add(candidate);
+                            newDerby = candidate;
+                        }
+                    }
+
+                    SendToSocket(new PET_9_PROTOCOL.MSG_PETLEVELUP {
+                        GlobalID = pet.m_globalID,
+                        OverallRating = (byte) Math.Min(255u, petBehavior.m_overallRating),
+                        ActiveRating = (byte) Math.Min(255u, petBehavior.m_activeRating),
+                        PetLevel = petBehavior.m_level,
+                        NewTalent = newTalent,
+                        NewDerbyPower = newDerby,
+                        NewJewel = 0,
+                        Display = 1
+                    });
+                }
+
+                WizardCollection.UpdateCharacterItems(wizard);
+            }
+
+            SendToSocket(new GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM {
+                FedObjectID = message.FedObjectID,
+                PetID = message.PetID
+            });
+            return;
+        }
+
+        var gear = wizard.InventoryBehavior?.GetItem(message.FedObjectID);
+        if (gear != null) {
+            wizard.RemoveItemFromInventory(gear.m_globalID);
+            SendToSocket(new GAME_5_PROTOCOL.MSG_INVENTORYBEHAVIOR_REMOVEITEM {
+                GlobalID = wizard.GameObjectID,
+                ItemID = gear.m_globalID
+            });
+
+            int goldReward = Random.Shared.Next(15, 60);
+            wizard.AddGold(goldReward);
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEGOLD {
+                Gold = wizard.GameStats.m_currentGold,
+                MaxGold = wizard.GameStats.m_baseGoldPouch
+            });
+
+            SendToSocket(new GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM {
+                FedObjectID = message.FedObjectID,
+                PetID = message.PetID
+            });
+            return;
+        }
+
+        SendToSocket(new GAME_5_PROTOCOL.MSG_FEEDINVENTORYITEM {
+            FedObjectID = message.FedObjectID,
+            PetID = message.PetID
+        });
+    }"""
+
+    replace("Game/Services/InventoryService.cs", old_feed, new_feed)
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -265,6 +551,10 @@ def main() -> None:
     patch_combat_accuracy()
     patch_crown_shop()
     patch_director_crown_shop()
+    patch_dorm_and_zones()
+    patch_bank_system()
+    patch_pet_feeding()
+    shutil.copy2(ROOT / "BankService.cs", SOURCE / "Game/Services/BankService.cs")
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
@@ -289,7 +579,7 @@ def main() -> None:
     shutil.copy2(ROOT / "CrownShopModels.cs", SOURCE / "Game/CrownShop/CrownShopModels.cs")
     shutil.copy2(ROOT / "CrownShopHandler.cs", SOURCE / "Game/CrownShop/CrownShopHandler.cs")
     shutil.copy2(ROOT / "CrownShopService.cs", SOURCE / "Game/Services/CrownShopService.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
