@@ -1051,6 +1051,36 @@ def patch_pet_hatching() -> None:
         Logger.Information("Pet hatching initiated! Created egg {0}", Logger.Args(egg.m_globalID));
     }
 
+    [MessageHandler(typeof(PET_9_PROTOCOL.MSG_PETGAMEEND))]
+    private void ReceivePetGameEnd(PET_9_PROTOCOL.MSG_PETGAMEEND message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        int currentEnergy = wizard.PetOwnerBehavior?.Energy ?? 0;
+        if (currentEnergy >= 2) {
+            wizard.UpdateEnergy(currentEnergy - 2);
+        }
+
+        SendToSocket(new PET_9_PROTOCOL.MSG_PETGAMESNACKFEEDSUCCESS {
+            Data = Imcodec.IO.ByteString.Empty
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_PETGAMESKIP))]
+    private void ReceivePetGameSkip(WIZARD2_53_PROTOCOL.MSG_PETGAMESKIP message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        int currentEnergy = wizard.PetOwnerBehavior?.Energy ?? 0;
+        if (currentEnergy >= 2) {
+            wizard.UpdateEnergy(currentEnergy - 2);
+        }
+
+        SendToSocket(new PET_9_PROTOCOL.MSG_PETGAMESNACKFEEDSUCCESS {
+            Data = Imcodec.IO.ByteString.Empty
+        });
+    }
+
     [MessageHandler(typeof(PET_9_PROTOCOL.MSG_HATCHEGGNOW))]"""
     replace("Game/Services/PetService.cs", old_hatch, new_hatch)
 
@@ -1083,6 +1113,9 @@ def main() -> None:
     shutil.copy2(ROOT / "HousingService.cs", SOURCE / "Game/Services/HousingService.cs")
     shutil.copy2(ROOT / "GardeningService.cs", SOURCE / "Game/Services/GardeningService.cs")
     shutil.copy2(ROOT / "FishingService.cs", SOURCE / "Game/Services/FishingService.cs")
+    shutil.copy2(ROOT / "DailyQuestService.cs", SOURCE / "Game/Services/DailyQuestService.cs")
+    shutil.copy2(ROOT / "MonstrologyService.cs", SOURCE / "Game/Services/MonstrologyService.cs")
+    shutil.copy2(ROOT / "CastleToursService.cs", SOURCE / "Game/Services/CastleToursService.cs")
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
@@ -1107,12 +1140,87 @@ def main() -> None:
     shutil.copy2(ROOT / "CrownShopModels.cs", SOURCE / "Game/CrownShop/CrownShopModels.cs")
     shutil.copy2(ROOT / "CrownShopHandler.cs", SOURCE / "Game/CrownShop/CrownShopHandler.cs")
     shutil.copy2(ROOT / "CrownShopService.cs", SOURCE / "Game/Services/CrownShopService.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),\n        typeof(CraftingService),\n        typeof(TradeService),\n        typeof(HousingService),\n        typeof(GardeningService),\n        typeof(FishingService),")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),\n        typeof(CraftingService),\n        typeof(TradeService),\n        typeof(HousingService),\n        typeof(GardeningService),\n        typeof(FishingService),\n        typeof(DailyQuestService),\n        typeof(MonstrologyService),\n        typeof(CastleToursService),")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
 
         // The raw message is just like any other message sent by the client.""")
+    replace("Game/Services/MinigameService.cs", "    private const ushort MAGIC_HEADER = (ushort) 0xF00Du;", """    private const ushort MAGIC_HEADER = (ushort) 0xF00Du;
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_MINIGAMEREWARDS))]
+    private void ReceiveMinigameRewards(WIZARD_12_PROTOCOL.MSG_MINIGAMEREWARDS message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        wizard.GameStats.m_potionCharge = wizard.GameStats.m_potionMax;
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEPOTIONS {
+            PotionMax = wizard.GameStats.m_potionMax,
+            PotionCharge = wizard.GameStats.m_potionCharge
+        });
+
+        int goldReward = Math.Max(50, message.Score / 10);
+        wizard.AddGold(goldReward);
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEGOLD {
+            Gold = wizard.GameStats.m_currentGold
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_USEPOTION))]
+    private void ReceiveUsePotion(WIZARD_12_PROTOCOL.MSG_USEPOTION message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        if (wizard.GameStats.m_potionCharge >= 1.0f) {
+            wizard.GameStats.m_potionCharge -= 1.0f;
+            wizard.GameStats.m_currentHitpoints = wizard.GameStats.m_baseHitpoints;
+            wizard.GameStats.m_currentMana = wizard.GameStats.m_baseMana;
+
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEPOTIONS {
+                PotionMax = wizard.GameStats.m_potionMax,
+                PotionCharge = wizard.GameStats.m_potionCharge
+            });
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEHEALTH {
+                CharacterID = wizard.GameObjectID,
+                NewHealth = wizard.GameStats.m_currentHitpoints,
+                NewHealthMax = wizard.GameStats.m_baseHitpoints,
+                DisplayDiff = 1
+            });
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEMANA {
+                Mana = wizard.GameStats.m_currentMana,
+                MaxMana = wizard.GameStats.m_baseMana,
+                DisplayDiff = 1
+            });
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_POTIONBUYREQUEST))]
+    private void ReceivePotionBuyRequest(WIZARD_12_PROTOCOL.MSG_POTIONBUYREQUEST message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        int potionCost = 150;
+        if (wizard.GameStats.m_currentGold >= potionCost) {
+            wizard.AddGold(-potionCost);
+            wizard.GameStats.m_potionCharge = wizard.GameStats.m_potionMax;
+
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEGOLD {
+                Gold = wizard.GameStats.m_currentGold
+            });
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEPOTIONS {
+                PotionMax = wizard.GameStats.m_potionMax,
+                PotionCharge = wizard.GameStats.m_potionCharge
+            });
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_POTIONBUYCONFIRM {
+                Failure = 0
+            });
+        }
+        else {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_POTIONBUYCONFIRM {
+                Failure = 1
+            });
+        }
+    }""")
     shutil.copy2(ROOT / "RandomizerLevelRequirement.cs", SOURCE / "Game/Requirements/Handlers/RandomizerLevelRequirement.cs")
     replace("Login/Services/CharacterService.cs", "        SendToSocket(new LOGIN_7_PROTOCOL.MSG_CHARACTERLIST());", """        SendToSocket(new LOGIN_7_PROTOCOL.MSG_CHARACTERLIST());
         if (Imlight.CoreLib.Game.RandomizerRuntime.Enabled) {
