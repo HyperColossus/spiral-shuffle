@@ -320,5 +320,9 @@ internal class SpellbookService(SessionActor sessionActor) : MessageService(sess
             FailedRequirementIndex = 0
         });
     }
-    
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_CLEAR_EQUIPPED_DECK))]
+    private void ReceiveClearEquippedDeck(WIZARD_12_PROTOCOL.MSG_CLEAR_EQUIPPED_DECK message) {
+        SendToSocket(message);
+    }
 }

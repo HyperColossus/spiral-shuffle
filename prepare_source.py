@@ -1137,6 +1137,11 @@ def main() -> None:
     shutil.copy2(ROOT / "BattleCardService.cs", SOURCE / "Game/Services/BattleCardService.cs")
     shutil.copy2(ROOT / "SocialModerationService.cs", SOURCE / "Game/Services/SocialModerationService.cs")
     shutil.copy2(ROOT / "RaidAndEventService.cs", SOURCE / "Game/Services/RaidAndEventService.cs")
+    shutil.copy2(ROOT / "MultiplayerMountService.cs", SOURCE / "Game/Services/MultiplayerMountService.cs")
+    shutil.copy2(ROOT / "CastleGameService.cs", SOURCE / "Game/Services/CastleGameService.cs")
+    shutil.copy2(ROOT / "ChatChannelService.cs", SOURCE / "Game/Services/ChatChannelService.cs")
+    shutil.copy2(ROOT / "FishMarketService.cs", SOURCE / "Game/Services/FishMarketService.cs")
+    shutil.copy2(ROOT / "SorceryStonesService.cs", SOURCE / "Game/Services/SorceryStonesService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1442,7 +1447,12 @@ def main() -> None:
         typeof(RateMyStitchService),
         typeof(BattleCardService),
         typeof(SocialModerationService),
-        typeof(RaidAndEventService),""")
+        typeof(RaidAndEventService),
+        typeof(MultiplayerMountService),
+        typeof(CastleGameService),
+        typeof(ChatChannelService),
+        typeof(FishMarketService),
+        typeof(SorceryStonesService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }

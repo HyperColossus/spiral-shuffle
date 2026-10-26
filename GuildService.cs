@@ -83,4 +83,31 @@ internal sealed class GuildService(SessionActor sessionActor) : MessageService(s
             Status = 1
         });
     }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_REQUESTMUSEUMCURATOR))]
+    private void ReceiveRequestMuseumCurator(WIZARD3_56_PROTOCOL.MSG_REQUESTMUSEUMCURATOR message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_REQUESTGUILDUNLOCKDATA))]
+    private void ReceiveRequestGuildUnlockData(WIZARD3_56_PROTOCOL.MSG_REQUESTGUILDUNLOCKDATA message) {
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_UPDATEGUILDUNLOCKTRIGGER {
+            PartyGID = 1,
+            ReagentIndex = 0,
+            Quantity = 10,
+            TemplateID = 10001,
+            State = 1
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_GUILDUNLOCKREQUEST))]
+    private void ReceiveGuildUnlockRequest(WIZARD3_56_PROTOCOL.MSG_GUILDUNLOCKREQUEST message) {
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_UPDATEGUILDUNLOCKTRIGGER {
+            PartyGID = message.PartyGID,
+            ReagentIndex = message.ReagentIndex,
+            Quantity = message.Quantity,
+            TemplateID = 10001,
+            State = 1
+        });
+    }
 }
