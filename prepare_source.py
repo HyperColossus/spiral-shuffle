@@ -1216,6 +1216,11 @@ def main() -> None:
         });
     }
 
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_ACCEPTQUESTBOGUS))]
+    private void ReceiveAcceptQuestBogus(WIZARD_12_PROTOCOL.MSG_ACCEPTQUESTBOGUS message) {
+        Logger.Debug("Received MSG_ACCEPTQUESTBOGUS for quest '{0}'", Logger.Args(message.QuestName.ToString()));
+    }
+
 }""")
     replace("Game/Combat/CombatDuelSubCircle.cs", """    internal void DoPipGain() {
         // If the participant has the maximum amount of pips, do not gain any more.

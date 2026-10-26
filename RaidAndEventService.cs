@@ -50,4 +50,43 @@ internal sealed class RaidAndEventService(SessionActor sessionActor) : MessageSe
             MetRequirements = 1
         });
     }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTSIGILINFO))]
+    private void ReceiveRequestSigilInfo(WIZARD2_53_PROTOCOL.MSG_REQUESTSIGILINFO message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_REQUESTSIGILINFO {
+            SigilID = message.SigilID,
+            WorldID = message.WorldID,
+            SigilInfo = "ActiveDungeonSigil",
+            Request = 0,
+            PlayerGID = message.PlayerGID,
+            IsCluster = message.IsCluster,
+            ClientPlatform = message.ClientPlatform
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_SETSIGILSLOT))]
+    private void ReceiveSetSigilSlot(WIZARD3_56_PROTOCOL.MSG_SETSIGILSLOT message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_REQUESTCOMBATSIGILS))]
+    private void ReceiveRequestCombatSigils(WIZARD_12_PROTOCOL.MSG_REQUESTCOMBATSIGILS message) {
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_SUBMITCOMBATSIGILS {
+            ZoneID = message.ZoneID,
+            SigilPositions = ""
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_SUBMITCOMBATSIGILS))]
+    private void ReceiveSubmitCombatSigils(WIZARD_12_PROTOCOL.MSG_SUBMITCOMBATSIGILS message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_ZONEGATELIST))]
+    private void ReceiveZoneGateList(WIZARD2_53_PROTOCOL.MSG_ZONEGATELIST message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_ZONEGATELIST {
+            GlobalID = message.GlobalID,
+            Data = "UnlockedRaidGateList"
+        });
+    }
 }
