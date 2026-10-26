@@ -1187,6 +1187,11 @@ def main() -> None:
     shutil.copy2(ROOT / "LevelUpElixirService.cs", SOURCE / "Game/Services/LevelUpElixirService.cs")
     shutil.copy2(ROOT / "QuestNavigationService.cs", SOURCE / "Game/Services/QuestNavigationService.cs")
     shutil.copy2(ROOT / "HallOfFameService.cs", SOURCE / "Game/Services/HallOfFameService.cs")
+    shutil.copy2(ROOT / "BazaarCatalogService.cs", SOURCE / "Game/Services/BazaarCatalogService.cs")
+    shutil.copy2(ROOT / "CombatMechanicsService.cs", SOURCE / "Game/Services/CombatMechanicsService.cs")
+    shutil.copy2(ROOT / "AdvancedPetBreedingService.cs", SOURCE / "Game/Services/AdvancedPetBreedingService.cs")
+    shutil.copy2(ROOT / "HousingCustomizationService.cs", SOURCE / "Game/Services/HousingCustomizationService.cs")
+    shutil.copy2(ROOT / "RealmAndBadgeService.cs", SOURCE / "Game/Services/RealmAndBadgeService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1547,7 +1552,12 @@ def main() -> None:
         typeof(HousingExpansionService),
         typeof(LevelUpElixirService),
         typeof(QuestNavigationService),
-        typeof(HallOfFameService),""")
+        typeof(HallOfFameService),
+        typeof(BazaarCatalogService),
+        typeof(CombatMechanicsService),
+        typeof(AdvancedPetBreedingService),
+        typeof(HousingCustomizationService),
+        typeof(RealmAndBadgeService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
