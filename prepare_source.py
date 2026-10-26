@@ -1204,6 +1204,12 @@ def main() -> None:
     shutil.copy2(ROOT / "LootRollAndInventoryService.cs", SOURCE / "Game/Services/LootRollAndInventoryService.cs")
     shutil.copy2(ROOT / "CantripAndMagicClearService.cs", SOURCE / "Game/Services/CantripAndMagicClearService.cs")
     shutil.copy2(ROOT / "PlatformAndPromotionService.cs", SOURCE / "Game/Services/PlatformAndPromotionService.cs")
+    shutil.copy2(ROOT / "AdventurePartyBulletinService.cs", SOURCE / "Game/Services/AdventurePartyBulletinService.cs")
+    shutil.copy2(ROOT / "PvPTourneyQueueService.cs", SOURCE / "Game/Services/PvPTourneyQueueService.cs")
+    shutil.copy2(ROOT / "BeastmoonBattlegroundService.cs", SOURCE / "Game/Services/BeastmoonBattlegroundService.cs")
+    shutil.copy2(ROOT / "GuildIslandPermissionService.cs", SOURCE / "Game/Services/GuildIslandPermissionService.cs")
+    shutil.copy2(ROOT / "HousingInteractiveNetworkService.cs", SOURCE / "Game/Services/HousingInteractiveNetworkService.cs")
+    shutil.copy2(ROOT / "SocialRadialAndMovementService.cs", SOURCE / "Game/Services/SocialRadialAndMovementService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1581,7 +1587,13 @@ def main() -> None:
         typeof(GardeningLifecycleService),
         typeof(LootRollAndInventoryService),
         typeof(CantripAndMagicClearService),
-        typeof(PlatformAndPromotionService),""")
+        typeof(PlatformAndPromotionService),
+        typeof(AdventurePartyBulletinService),
+        typeof(PvPTourneyQueueService),
+        typeof(BeastmoonBattlegroundService),
+        typeof(GuildIslandPermissionService),
+        typeof(HousingInteractiveNetworkService),
+        typeof(SocialRadialAndMovementService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
