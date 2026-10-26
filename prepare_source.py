@@ -1216,6 +1216,12 @@ def main() -> None:
     shutil.copy2(ROOT / "ChatChannelSubscriptionService.cs", SOURCE / "Game/Services/ChatChannelSubscriptionService.cs")
     shutil.copy2(ROOT / "ItemStackAndStorageSyncService.cs", SOURCE / "Game/Services/ItemStackAndStorageSyncService.cs")
     shutil.copy2(ROOT / "ClientTutorialAndReportService.cs", SOURCE / "Game/Services/ClientTutorialAndReportService.cs")
+    shutil.copy2(ROOT / "CastleToursModerationService.cs", SOURCE / "Game/Services/CastleToursModerationService.cs")
+    shutil.copy2(ROOT / "CatchOfDayAndLuckService.cs", SOURCE / "Game/Services/CatchOfDayAndLuckService.cs")
+    shutil.copy2(ROOT / "DungeonInstanceLifecycleService.cs", SOURCE / "Game/Services/DungeonInstanceLifecycleService.cs")
+    shutil.copy2(ROOT / "CrownServicesAndExpansionService.cs", SOURCE / "Game/Services/CrownServicesAndExpansionService.cs")
+    shutil.copy2(ROOT / "AdventureKioskAndFocusService.cs", SOURCE / "Game/Services/AdventureKioskAndFocusService.cs")
+    shutil.copy2(ROOT / "InventoryLimitAndBoosterService.cs", SOURCE / "Game/Services/InventoryLimitAndBoosterService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1605,7 +1611,13 @@ def main() -> None:
         typeof(HousingTextureAndPetService),
         typeof(ChatChannelSubscriptionService),
         typeof(ItemStackAndStorageSyncService),
-        typeof(ClientTutorialAndReportService),""")
+        typeof(ClientTutorialAndReportService),
+        typeof(CastleToursModerationService),
+        typeof(CatchOfDayAndLuckService),
+        typeof(DungeonInstanceLifecycleService),
+        typeof(CrownServicesAndExpansionService),
+        typeof(AdventureKioskAndFocusService),
+        typeof(InventoryLimitAndBoosterService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
