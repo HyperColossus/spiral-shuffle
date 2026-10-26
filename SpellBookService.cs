@@ -296,5 +296,29 @@ internal class SpellbookService(SessionActor sessionActor) : MessageService(sess
     private void ReceiveUpdateArchmastery(WIZARD3_56_PROTOCOL.MSG_UPDATEARCHMASTERY message) {
         SendToSocket(message);
     }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_TIEREDSPELLUPGRADE))]
+    private void ReceiveTieredSpellUpgrade(WIZARD2_53_PROTOCOL.MSG_TIEREDSPELLUPGRADE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var spellbook = wizard.SpellbookBehavior;
+        if (spellbook is not null && message.SpellIDNew > 0) {
+            spellbook.RemoveSpellFromBook(message.SpellID);
+            var newSpell = Imlight.CoreLib.Game.Spells.SpellFactory.GetSpell(message.SpellIDNew);
+            if (newSpell is not null) {
+                spellbook.AddSpellToBook(newSpell);
+            }
+
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_ADDSPELLTOBOOK {
+                SpellID = (int) message.SpellIDNew
+            });
+        }
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_TIEREDSPELLUPGRADERESP {
+            Success = 1,
+            FailedRequirementIndex = 0
+        });
+    }
     
 }

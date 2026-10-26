@@ -1,0 +1,55 @@
+/*
+ * Imlight
+ * Copyright (C) 2025 Revive101
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ */
+
+using System;
+using Akka.Actor;
+using Imcodec.MessageLayer.Generated;
+using Imlight.Common;
+using Imlight.CoreLib.Shared.Networking;
+using Imlight.CoreLib.WizardData.Models.Player;
+
+namespace Imlight.CoreLib.Game.Services;
+
+internal sealed class PvPTournamentService(SessionActor sessionActor) : MessageService(sessionActor) {
+
+    public static Props Props(SessionActor parentActor)
+        => Akka.Actor.Props.Create(() => new PvPTournamentService(parentActor));
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_PVPCONFIRMTOURNEY))]
+    private void ReceivePvPConfirmTourney(WIZARD_12_PROTOCOL.MSG_PVPCONFIRMTOURNEY message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_PVPCONFIRMTOURNEY {
+            CharacterID = wizard.CharId,
+            RegistrationID = message.RegistrationID,
+            BracketID = message.BracketID > 0 ? message.BracketID : 1,
+            PricePvPTourneyCurrency = message.PricePvPTourneyCurrency,
+            PlayerPvPTourneyCurrency = 1000
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PVP5THAGEKIOSKREQUEST))]
+    private void ReceivePvP5thAgeKiosk(WIZARD3_56_PROTOCOL.MSG_PVP5THAGEKIOSKREQUEST message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_AdvPvPEloData {
+            GlobalID = wizard.GameObjectID,
+            EntryList = "Rank: Warlord, Rating: 1500",
+            CheckCompletion = 1
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_PvPStatueInspect))]
+    private void ReceivePvPStatueInspect(WIZARD3_56_PROTOCOL.MSG_PvPStatueInspect message) {
+        SendToSocket(message);
+    }
+}
