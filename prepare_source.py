@@ -1127,6 +1127,10 @@ def main() -> None:
     shutil.copy2(ROOT / "PhotomancyService.cs", SOURCE / "Game/Services/PhotomancyService.cs")
     shutil.copy2(ROOT / "PvPTournamentService.cs", SOURCE / "Game/Services/PvPTournamentService.cs")
     shutil.copy2(ROOT / "LoyaltyService.cs", SOURCE / "Game/Services/LoyaltyService.cs")
+    shutil.copy2(ROOT / "BadgeService.cs", SOURCE / "Game/Services/BadgeService.cs")
+    shutil.copy2(ROOT / "MagicMirrorService.cs", SOURCE / "Game/Services/MagicMirrorService.cs")
+    shutil.copy2(ROOT / "EquipmentSetService.cs", SOURCE / "Game/Services/EquipmentSetService.cs")
+    shutil.copy2(ROOT / "EmoteService.cs", SOURCE / "Game/Services/EmoteService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1422,7 +1426,11 @@ def main() -> None:
         typeof(AdventurePartyService),
         typeof(PhotomancyService),
         typeof(PvPTournamentService),
-        typeof(LoyaltyService),""")
+        typeof(LoyaltyService),
+        typeof(BadgeService),
+        typeof(MagicMirrorService),
+        typeof(EquipmentSetService),
+        typeof(EmoteService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
@@ -1602,6 +1610,53 @@ def main() -> None:
             Imlight.CoreLib.Game.RandomizerRuntime.GetMode(_wizard.AccountId));""")
     replace("Game/Combat/CombatDuelSubCircle.cs", "        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE);", """        _combatDeck = new CombatDeck(spellData, [], PLAYER_HAND_SIZE,
             Imlight.CoreLib.Game.RandomizerRuntime.ModeForPath(ParticipantActor.Path.ToString()));""")
+    replace("Game/Services/CombatService.cs", """    [MessageHandler(typeof(COMBAT_106_PROTOCOL.MSG_COMBATDEFEAT))]
+    private void ReceiveCombatDefeat(COMBAT_106_PROTOCOL.MSG_COMBATDEFEAT message) {
+        GetActiveWizard().IsInDuel = false;
+        EquipMountSubtle();
+
+        // We've fled or have been defeated in this duel. Send us back to the world hub.
+        var hubMsg = new ZONE_102_PROTOCOL.MSG_SENDTOHUB();
+        TellOtherServices(hubMsg);
+    }""", """    [MessageHandler(typeof(COMBAT_106_PROTOCOL.MSG_COMBATDEFEAT))]
+    private void ReceiveCombatDefeat(COMBAT_106_PROTOCOL.MSG_COMBATDEFEAT message) {
+        GetActiveWizard().IsInDuel = false;
+        EquipMountSubtle();
+
+        // We've fled or have been defeated in this duel. Send us back to the world hub.
+        var hubMsg = new ZONE_102_PROTOCOL.MSG_SENDTOHUB();
+        TellOtherServices(hubMsg);
+    }
+
+    [MessageHandler(typeof(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_COMBATFLEE))]
+    private void ReceiveCombatFlee(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_COMBATFLEE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        wizard.IsInDuel = false;
+        wizard.GameStats.m_currentHitpoints = 1;
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEHEALTH {
+            CharacterID = wizard.GameObjectID,
+            NewHealth = 1,
+            NewHealthMax = wizard.GameStats.m_baseHitpoints,
+            DisplayDiff = 1
+        });
+        EquipMountSubtle();
+
+        TellOtherServices(new ZONE_102_PROTOCOL.MSG_SENDTOHUB());
+    }
+
+    [MessageHandler(typeof(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_COMBATAFK))]
+    private void ReceiveCombatAFK(DOODLEDOUG_MESSAGES_51_PROTOCOL.MSG_COMBATAFK message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_BATTLECARDTRASH))]
+    private void ReceiveBattleCardTrash(WIZARD2_53_PROTOCOL.MSG_BATTLECARDTRASH message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_BATTLECARDTRASHCONFIRM {
+            Failure = 0
+        });
+    }""")
     patch_vendor_hooks(replace)
     patch_spell_drops(replace)
     patch_item_cards(replace)
