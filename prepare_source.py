@@ -1131,6 +1131,12 @@ def main() -> None:
     shutil.copy2(ROOT / "MagicMirrorService.cs", SOURCE / "Game/Services/MagicMirrorService.cs")
     shutil.copy2(ROOT / "EquipmentSetService.cs", SOURCE / "Game/Services/EquipmentSetService.cs")
     shutil.copy2(ROOT / "EmoteService.cs", SOURCE / "Game/Services/EmoteService.cs")
+    shutil.copy2(ROOT / "HousingFeatureService.cs", SOURCE / "Game/Services/HousingFeatureService.cs")
+    shutil.copy2(ROOT / "FriendlyPlayerService.cs", SOURCE / "Game/Services/FriendlyPlayerService.cs")
+    shutil.copy2(ROOT / "RateMyStitchService.cs", SOURCE / "Game/Services/RateMyStitchService.cs")
+    shutil.copy2(ROOT / "BattleCardService.cs", SOURCE / "Game/Services/BattleCardService.cs")
+    shutil.copy2(ROOT / "SocialModerationService.cs", SOURCE / "Game/Services/SocialModerationService.cs")
+    shutil.copy2(ROOT / "RaidAndEventService.cs", SOURCE / "Game/Services/RaidAndEventService.cs")
     replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
         => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
     replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
@@ -1430,7 +1436,13 @@ def main() -> None:
         typeof(BadgeService),
         typeof(MagicMirrorService),
         typeof(EquipmentSetService),
-        typeof(EmoteService),""")
+        typeof(EmoteService),
+        typeof(HousingFeatureService),
+        typeof(FriendlyPlayerService),
+        typeof(RateMyStitchService),
+        typeof(BattleCardService),
+        typeof(SocialModerationService),
+        typeof(RaidAndEventService),""")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
