@@ -1,0 +1,884 @@
+/*
+ * Imlight
+ * Copyright (C) 2025 Revive101
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * ========================================================================
+ * FRIENDS SERVICE
+ * ========================================================================
+ * 
+ * PURPOSE:
+ * Manages player friend requests, buddy list, and relationship status.
+ * 
+ * USAGE EXAMPLE:
+ * Internal service handling various social-related messages and actions 
+ * within the game server's session management system.
+ * 
+ * NOTE:
+ * Flow to adding a friend:
+    1. Player A clicks on player B's character and selects "Add Friend".
+        Player A sends GAME_5_PROTOCOL.MSG_BUDDYREQUESTADD to the server. Player A keeps track of player B's ID.
+    2. Server forwards the request to player B with CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTADDFWD.
+    3. Player B receives the request, and adds it to their pending friend requests. They will see a notification in the client.
+    4. Player B can now accept or deny the request.
+        a. If they accept, they send GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT to the server.
+        b. If they deny, they send GAME_5_PROTOCOL.MSG_BUDDYREQUESTDENY to the server.
+    5. Server forwards the response to player A with CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD. If the sender
+         is offline, we will have to go to the database directly to add the friend.
+    6. Player A receives the response. If the response is an acceptance, they will add the friend to their list.
+        Player A's game client will see a notification that the friend request has been accepted.
+
+    - The protocol uses two distinct ID domains for characters:
+        - Character ID , the persistent character/account-level identifier (m_characterId)
+        - GameObject ID , the runtime object identifier (WizClientObject.m_globalID.m_full)
+    - Field names are not sufficient to determine the ID domain. In particular, fields named GID, GlobalID, or
+        similar may contain either a Character ID or a GameObject ID depending on the message and context.
+
+    - Instances where the GameObject ID is used:
+        - GAME_5_PROTOCOL.MSG_BUDDYSTATS.TargetCharacterGID
+        - GAME_5_PROTOCOL.MSG_BUDDYSTATS.BuddyID
+        - GAME_5_PROTOCOL.MSG_BUDDYENTRY.ListOwnerGID
+        - GAME_5_PROTOCOL.MSG_BUDDYLISTCOMPLETE.ListOwnerGID
+        - GAME_5_PROTOCOL.MSG_BUDDYSTATUSUPDATE.ListOwnerGID
+        - GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT.SourceObjectID
+        - GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT.DestObjectID
+        - GAME_5_PROTOCOL.MSG_BUDDYREQUESTADD.EntryGID
+            - For the initial client → server buddy request, this is the target's GameObject ID.
+    - Instances where the Char ID is used:
+        - GAME_5_PROTOCOL.MSG_BUDDYENTRY.EntryGID
+        - GAME_5_PROTOCOL.MSG_IGNOREADD.CharacterGID
+        - GAME_5_PROTOCOL.MSG_IGNOREDROP.CharacterGID
+        - GAME_5_PROTOCOL.MSG_GOTOPLAYER.TargetCharacterID
+        - GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT.ListOwnerGID
+        - GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT.EntryGID
+        - GAME_5_PROTOCOL.MSG_BUDDYSTATUSUPDATE.EntryGID
+
+    - Consequently, buddy messages can contain both ID domains in the same message. For example, MSG_BUDDYREQUESTACCEPT uses:
+        - GameObject IDs:
+            - SourceObjectID , the recipient's GameObject ID
+            - DestObjectID , the requester's GameObject ID
+        - Character IDs:
+            - ListOwnerGID , the requester's Character ID
+            - EntryGID , the recipient's Character ID
+    
+    - GlobalID should therefore be treated as a context-dependent protocol field, not as a synonym for GameObjectID.
+        For example, CharacterInfo.GlobalID contains the Character ID despite its name.
+
+    ============ BUDDY STATS ============
+
+    - The character window asks with `MSG_BUDDYSTATS`, sending the checksum of every block it cached on
+        disk. Blocks whose checksum still matches are left out of the reply (see BuddyStatsBuilder).
+    - The client only asks about friends who are online and players it can see. Online players answer
+        from their own session (`MSG_BUDDYSTATSFWD`); other characters are rebuilt from the database.
+
+    =====================================
+ * 
+ * TODO:
+ * - Implement the `PreviousName` field in `MSG_BUDDYENTRY`.
+ * 
+ * Created by: Jooty
+ * Version: KALI 1.0
+ * Last Updated: 09/26/2026
+ */
+
+using System;
+using System.Linq;
+using Akka.Actor;
+using Imcodec.Cryptography;
+using Imcodec.Math;
+using Imcodec.MessageLayer;
+using Imcodec.MessageLayer.Generated;
+using Imcodec.ObjectProperty;
+using Imcodec.ObjectProperty.TypeCache;
+using Imlight.Common;
+using Imlight.CoreLib.Shared.Behaviors;
+using Imlight.CoreLib.Shared.Character;
+using Imlight.CoreLib.Shared.Networking;
+using Imlight.CoreLib.Shared.Packets;
+using Imlight.CoreLib.Shared.Resources;
+using Imlight.CoreLib.Shared.Utilities;
+using Imlight.CoreLib.WizardData.Collections;
+using Imlight.CoreLib.WizardData.Models.Player;
+
+namespace Imlight.CoreLib.Game.Services;
+
+internal class FriendsService(SessionActor sessionActor) : MessageService(sessionActor) {
+
+    private const byte OFFLINE_STATUS_CODE = 1;
+    private const byte ONLINE_STATUS_CODE = 4;
+    private const float QUERY_TELEPORT_WIZARD_TIMEOUT_IN_SECONDS = 2;
+    private readonly uint _englishLocaleHash = StringHash.Compute("English");
+
+    protected static Props Props(SessionActor parentActor)
+        => Akka.Actor.Props.Create(() => new FriendsService(parentActor));
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYREQUESTLIST))]
+    private void ReceiveBuddyRequestList(GAME_5_PROTOCOL.MSG_BUDDYREQUESTLIST message) {
+        // When the player logs into the game, their client will request a list of their buddies.
+        // We will iterate through the player's friends and send them an entry for each.
+        var wizard = GetActiveWizard();
+        var charId = wizard.CharId;
+
+        // Iterate through the player's friends and send them an entry.
+        var buddies = BuddyRelationshipCollection.GetBuddiesForWizard(charId);
+        foreach (var buddy in buddies.Where(buddy => buddy != null)) {
+            // When players add each other, they create a "Relationship." This is a record of their
+            // interactions. When a player unfriends/blocks/reports another, that relationship is still exist
+            // but is marked as "broken up." 
+            if (!wizard.FriendsBehavior.TryGetRelationship(buddy.CharId, out var relationship)
+                || relationship.IsBrokenUp) {
+                // Ignore the relationship if it is broken up.
+                Logger.Debug("{0} has a friend named {1} (ID: {2}), but the relationship is broken up.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(),
+                    buddy.PlayerNameBehavior.GetWizardName(),
+                    buddy.CharId)
+                );
+
+                continue;
+            }
+            else if (relationship.Blocked) {
+                // Ignore the relationship if it is blocked.
+                Logger.Debug("{0} has a friend named {1} (ID: {2}), but the relationship is blocked.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(),
+                    buddy.PlayerNameBehavior.GetWizardName(),
+                    buddy.CharId)
+                );
+
+                continue;
+            }
+            else if (!relationship.IsBrokenUp && !relationship.Blocked) {
+                // This relationship is valid. We can send it to the client.
+                SendBuddyEntry(buddy, relationship, wizard);
+            }
+            else {
+                Logger.Warning("{0} has a friend with character ID {1}, but the relationship was not found.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddy.CharId));
+            }
+        }
+
+        SendBuddyListEnd(wizard);
+        InformBuddiesOfStatusChange(true);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYSTATS))]
+    private void ReceiveBuddyStats(GAME_5_PROTOCOL.MSG_BUDDYSTATS message) {
+        if (!Wizard.TryGetCharacterId(message.BuddyID, out var buddyCharID)) {
+            return;
+        }
+
+        var wizard = GetActiveWizard();
+        if (wizard is null) {
+            return;
+        }
+
+        if (buddyCharID == wizard.CharId) {
+            SendBuddyStats(wizard, message, SessionActor.ActorRef, targetCharacterGid: 0);
+
+            return;
+        }
+
+        // An online player's own session holds their current health, gear and effects.
+        if (TryGetOnlinePlayer(buddyCharID, out var onlinePlayer)) {
+            var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYSTATSFWD {
+                Request = message,
+                BuddyCharId = buddyCharID,
+                Requester = SessionActor.ActorRef,
+                RequesterGameObjectId = wizard.GameObjectID
+            };
+            Context.ActorSelection(onlinePlayer.ActorPath).Tell(fwdMsg);
+
+            return;
+        }
+
+        SendStoredBuddyStats(message, buddyCharID, SessionActor.ActorRef, targetCharacterGid: 0);
+    }
+
+    [MessageHandler(typeof(CHARACTER_103_PROTOCOL.MSG_BUDDYSTATSFWD))]
+    private void ReceiveBuddyStatsFwd(CHARACTER_103_PROTOCOL.MSG_BUDDYSTATSFWD message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null || wizard.CharId != message.BuddyCharId) {
+            SendStoredBuddyStats(message.Request, message.BuddyCharId,
+                message.Requester, message.RequesterGameObjectId);
+
+            return;
+        }
+
+        SendBuddyStats(wizard, message.Request, message.Requester, message.RequesterGameObjectId);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYREQUESTADD))]
+    private void ReceiveBuddyRequestAdd(GAME_5_PROTOCOL.MSG_BUDDYREQUESTADD message) {
+        // (SEE TOP OF FILE FOR FLOW) Step 1:
+        // The player client has clicked on another player and selected "Add Friend".
+        // We need to forward this request to the recipient. We will find the online actor for the recipient
+        // and send the internal message "MSG_BUDDYREQUESTADDFWD" to them.
+        var wizard = GetActiveWizard();
+
+        if (!Wizard.TryGetCharacterId(message.EntryGID, out var buddyCharID) || buddyCharID == wizard.CharId) {
+            return;
+        }
+
+        // Check to see if the recipient is online. If not, there is naught we can do.
+        if (!TryGetOnlinePlayer(buddyCharID, out var onlinePlayer)) {
+            var wizardName = wizard.PlayerNameBehavior.GetWizardName();
+            Logger.Warning("{0} tried to add character ID {1} as a friend, but the character is not online.",
+                Logger.Args(wizardName, buddyCharID));
+
+            var errorMsg = new GAME_5_PROTOCOL.MSG_BUDDYREQUESTERROR {
+                ListOwnerGID = wizard.GameObjectID,
+                EntryGID = message.EntryGID,
+                Error = 1
+            };
+            SendToSocket(errorMsg);
+
+            return;
+        }
+
+        // Add the pending request to the sender. When we get a response from the recipient, we'll know it's valid.
+        if (!wizard.AddPendingFriendRequest(buddyCharID)) {
+            return;
+        }
+
+        // Forward the request to the recipient.
+        // (SEE TOP OF FILE FOR FLOW) Step 2
+        var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTADDFWD {
+            RequesterCharId = wizard.CharId,
+            RecipientCharId = buddyCharID,
+            OwnerName = DataManipulation.SpacedHexStringToBytes(wizard.PlayerNameBehavior.GetWizardNameAsByteHexString()),
+            OwnerLevel = (byte) wizard.MagicSchoolBehavior.Level,
+            OwnerSchool = wizard.MagicSchoolBehavior.MagicSchool.ToString()
+        };
+        Context.ActorSelection(onlinePlayer.ActorPath).Tell(fwdMsg);
+
+        Logger.Debug("{0} has sent a friend request to character ID {1}.",
+            Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+    }
+
+    [MessageHandler(typeof(CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTADDFWD))]
+    private void ReceiveBuddyRequestAddFwd(CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTADDFWD message) {
+        // (SEE TOP OF FILE FOR FLOW) Step 3:
+        // This actor has received a friend request from another player. We need to add it to the pending requests,
+        // and inform the game client.
+        var wizard = GetActiveWizard();
+
+        // Is the owner ID.. ourselves?
+        if (message.RequesterCharId == wizard.CharId) {
+            Logger.Warning("{0} tried to add themselves as a friend.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName()));
+
+            return;
+        }
+
+        var buddyCharID = message.RequesterCharId;
+
+        // Check to see if we already have this friend request pending.
+        if (wizard.FriendsBehavior.HasPendingFriendRequest(buddyCharID)) {
+            Logger.Warning("{0} tried to add character ID {1} as a friend, but the request is already pending.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Add the pending request to the recipient. When we get a response from the sender, we'll know it's valid.
+        wizard.AddPendingFriendRequest(buddyCharID);
+
+        // Inform the game client. We will now await the player's response.
+        var clientMsg = new GAME_5_PROTOCOL.MSG_BUDDYREQUESTADD {
+            ListOwnerGID = message.RequesterCharId,
+            EntryGID = message.RecipientCharId,
+            OwnerName = message.OwnerName,
+            OwnerLevel = message.OwnerLevel,
+            OwnerSchool = message.OwnerSchool
+        };
+        SendToSocket(clientMsg);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT))]
+    private void ReceiveBuddyRequestAccept(GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT message) {
+        // (SEE TOP OF FILE FOR FLOW) Step 4a: The recipient's game client has accepted the friend request.
+        var wizard = GetActiveWizard();
+
+        // Ensure that this wizard was even pending. If not, log an error and return.
+        // Replies identify the saved requester, unlike the initial object-targeted add request.
+        var buddyCharID = message.ListOwnerGID;
+        if (!wizard.RemovePendingFriendRequest(buddyCharID)) {
+            Logger.Error("{0} tried to add character ID {1} as a friend, but the request was not pending.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Add the wizard as a friend. If they are already friends, log an error and return.
+        if (!wizard.AddOrRepairRelationship(buddyCharID)) {
+            Logger.Error("{0} could not add or update the relationship with character ID {1}.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Forward the acceptance to the sender.
+        // (SEE TOP OF FILE FOR FLOW) Step 5a
+        if (!TryGetOnlinePlayer(buddyCharID, out var onlinePlayer)) {
+            // The sender is not online. We'll have to go to the database directly to add the friend.
+            var offlineWizard = WizardCollection.GetCharacter(buddyCharID);
+
+            // Ensure that this wizard was even pending. If not, log an error and return.
+            if (offlineWizard is null || !offlineWizard.RemovePendingFriendRequest(wizard.CharId)) {
+                Logger.Error("{0} tried to add character ID {1} as a friend, but the request was not pending.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+                return;
+            }
+
+            WizardCollection.UpdateCharacterFriendBehavior(offlineWizard);
+        }
+        else {
+            if (!wizard.FriendsBehavior.TryGetRelationship(buddyCharID, out var relationship)) {
+                Logger.Error("{0} tried to add character ID {1} as a friend, but the relationship was not found.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+                return;
+            }
+
+            // The player is still online, so we can forward the acceptance.
+            var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD {
+                RequesterCharId = buddyCharID,
+                RecipientCharId = wizard.CharId,
+                Accept = true,
+                NewRelationship = relationship
+            };
+            Context.ActorSelection(onlinePlayer.ActorPath).Tell(fwdMsg);
+        }
+
+        // Echo the packet back to the client.
+        SendToSocket(message);
+
+        // Send a buddy entry so the accepter sees the new friend immediately.
+        if (wizard.FriendsBehavior.TryGetRelationship(buddyCharID, out var newRelationship)) {
+            var buddyWizard = WizardCollection.GetCharacter(buddyCharID);
+            if (buddyWizard != null) {
+                SendBuddyEntry(buddyWizard, newRelationship, wizard);
+                SendBuddyListEnd(wizard);
+            }
+        }
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYREQUESTDENY))]
+    private void ReceiveBuddyRequestDeny(GAME_5_PROTOCOL.MSG_BUDDYREQUESTDENY message) {
+        // (SEE TOP OF FILE FOR FLOW) Step 4b: The recipient has denied the friend request.
+        var wizard = GetActiveWizard();
+        // Replies identify the saved requester, unlike the initial object-targeted add request.
+        var buddyCharID = message.ListOwnerGID;
+        // Ensure that this wizard was even pending. If not, log an error and return.
+        if (!wizard.RemovePendingFriendRequest(buddyCharID)) {
+            Logger.Error("{0} tried to deny a friend request from character ID {1}, but the request was not pending.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Forward the acceptance to the sender.
+        // (SEE TOP OF FILE FOR FLOW) Step 5b
+        if (!TryGetOnlinePlayer(buddyCharID, out var onlinePlayer)) {
+            // The sender is not online. We'll have to go to the database directly to remove the pending request.
+            var offlineWizard = WizardCollection.GetCharacter(buddyCharID);
+
+            // Ensure that this wizard was even pending. If not, log an error and return.
+            if (offlineWizard is null || !offlineWizard.RemovePendingFriendRequest(wizard.CharId)) {
+                Logger.Error("{0} tried to deny a friend request from character ID {1}, but the request was not pending.",
+                    Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+                return;
+            }
+
+            WizardCollection.UpdateCharacterFriendBehavior(offlineWizard);
+        }
+        else {
+            // The player is still online, so we can forward the denial.
+            var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD {
+                RequesterCharId = buddyCharID,
+                RecipientCharId = wizard.CharId,
+                Accept = false
+            };
+            Context.ActorSelection(onlinePlayer.ActorPath).Tell(fwdMsg);
+        }
+    }
+
+    [MessageHandler(typeof(CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD))]
+    private void ReceiveBuddyRequestReplyFwd(CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD message) {
+        // (SEE TOP OF FILE FOR FLOW) Step 6:
+        // We are informing player A that player B has accepted or denied their friend request.
+        var myWizard = GetActiveWizard();
+        IMessage clientMsg;
+
+        var buddyCharID = message.RecipientCharId;
+        myWizard.RemovePendingFriendRequest(buddyCharID);
+
+        if (message.Accept) {
+            var entryWizard = WizardCollection.GetCharacter(buddyCharID);
+            if (entryWizard is null) {
+                return;
+            }
+            var epochInSeconds = (uint) DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+            // Log
+            var myName = myWizard.PlayerNameBehavior.GetWizardName();
+            var entryName = entryWizard.PlayerNameBehavior.GetWizardName();
+            Logger.Debug("{0} (ID {1}) has received a friend request reply from {2} (ID {3}). They have accepted.",
+                Logger.Args(myName, myWizard.CharId, entryName, entryWizard.CharId));
+
+            // Add the wizard as a friend. If they are already friends, log an error and return.
+            if (!myWizard.AddOrRepairRelationship(message.NewRelationship)) {
+                Logger.Error("{0} could not add or update the relationship with character ID {1}.",
+                    Logger.Args(myWizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+                return;
+            }
+
+            var myWizardNameHex = myWizard.PlayerNameBehavior.GetWizardNameAsByteHexString();
+            var myWizardNameBytes = DataManipulation.SpacedHexStringToBytes(myWizardNameHex);
+            var entryWizardNameHex = entryWizard.PlayerNameBehavior.GetWizardNameAsByteHexString();
+            var entryWizardNameBytes = DataManipulation.SpacedHexStringToBytes(entryWizardNameHex);
+
+            // Inform the game client that the friend request has been accepted.
+            clientMsg = new GAME_5_PROTOCOL.MSG_BUDDYREQUESTACCEPT {
+                ListOwnerGID = message.RequesterCharId,
+                EntryGID = message.RecipientCharId,
+                OwnerName = myWizardNameBytes,
+                EntryName = entryWizardNameBytes,
+                SourceObjectID = myWizard.GameObjectID,
+                DestObjectID = entryWizard.GameObjectID,
+                Error = 0,
+                Permissions = (uint) entryWizard.Account.GetAccountFlags(),
+                EntryLocale = _englishLocaleHash,
+                FriendInfo = BuildFriendInfo(entryWizard, friendSymbol: 0),
+                FriendDate = epochInSeconds,
+                FriendStatusDate = epochInSeconds,
+            };
+
+            // Send a buddy entry so the requester sees the new friend immediately.
+            if (myWizard.FriendsBehavior.TryGetRelationship(buddyCharID, out var newRel)) {
+                SendBuddyEntry(entryWizard, newRel, myWizard);
+                SendBuddyListEnd(myWizard);
+            }
+        }
+        else {
+            // Log
+            var myName = myWizard.PlayerNameBehavior.GetWizardName();
+            Logger.Debug("{0} (ID {1}) has received a friend request reply from character ID {2}. They have denied.",
+                Logger.Args(myName, myWizard.CharId, buddyCharID));
+
+            // Inform the game client that the friend request has been denied.
+            clientMsg = new GAME_5_PROTOCOL.MSG_BUDDYREQUESTDENY {
+                ListOwnerGID = message.RequesterCharId,
+                EntryGID = message.RecipientCharId
+            };
+        }
+
+        SendToSocket(clientMsg);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BUDDYREQUESTDROP))]
+    private void ReceiveBuddyDrop(GAME_5_PROTOCOL.MSG_BUDDYREQUESTDROP message) {
+        // A player wants to remove a friend from their list. Start by removing the friend from ourselves first.
+        var wizard = GetActiveWizard();
+        // Buddy-list entries are keyed by saved character ID.
+        var buddyCharID = message.EntryGID;
+
+        if (!wizard.RemoveFriend(buddyCharID)) {
+            Logger.Error("{0} tried to remove character ID {1} as a friend, but they are not friends.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Check if the friend is online. If they are, we need to forward the drop to them. Otherwise,
+        // we can just remove them from the database.
+        if (TryGetOnlinePlayer(buddyCharID, out var onlinePlayer)) {
+            var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYDROPFWD {
+                RequesterCharId = wizard.CharId,
+                RecipientCharId = buddyCharID
+            };
+            Context.ActorSelection(onlinePlayer.ActorPath).Tell(fwdMsg);
+        }
+        else {
+            var offlineWizard = WizardCollection.GetCharacter(buddyCharID);
+            offlineWizard?.RemoveFriend(wizard.CharId);
+        }
+    }
+
+    [MessageHandler(typeof(CHARACTER_103_PROTOCOL.MSG_BUDDYDROPFWD))]
+    private void ReceiveBuddyDropFwd(CHARACTER_103_PROTOCOL.MSG_BUDDYDROPFWD message) {
+        // A player has removed us as a friend. We need to remove them from our friends list.
+        var wizard = GetActiveWizard();
+        // Remove the requester, not the recipient of this forwarded message.
+        var buddyCharID = message.RequesterCharId;
+
+        if (!wizard.RemoveFriend(buddyCharID)) {
+            Logger.Error("{0} tried to remove character ID {1} as a friend, but they are not friends.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        // Inform the client that the friend has been removed.
+        var clientMsg = new GAME_5_PROTOCOL.MSG_BUDDYDROP {
+            ListOwnerGID = wizard.GameObjectID,
+            EntryGID = buddyCharID
+        };
+        SendToSocket(clientMsg);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_BESTFRIEND))]
+    private void ReceiveBestFriend(GAME_5_PROTOCOL.MSG_BESTFRIEND message) {
+        // The client already shows the new symbol; the server only has to remember it for the next buddy list.
+        var wizard = GetActiveWizard();
+        var buddyCharID = message.BuddyID;
+
+        if (!wizard.FriendsBehavior.TryGetRelationship(buddyCharID, out var relationship)
+            || relationship.IsBrokenUp
+            || relationship.Blocked) {
+            Logger.Warning("{Name} tried to set a friend symbol on character ID {BuddyId}, who is not a friend.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), buddyCharID));
+
+            return;
+        }
+
+        relationship.SetFriendSymbol(wizard.CharId, message.FriendSymbol);
+        BuddyRelationshipCollection.UpdateFriendSymbol(wizard.CharId, buddyCharID, message.FriendSymbol);
+
+        Logger.Debug("{Name} set friend symbol {Symbol} on character ID {BuddyId}.",
+            Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), message.FriendSymbol, buddyCharID));
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_GOTOPLAYER))]
+    private void ReceiveGoToPlayer(GAME_5_PROTOCOL.MSG_GOTOPLAYER message) {
+        var targetID = message.TargetCharacterID;
+
+        // Check if the target is online.
+        if (!TryGetOnlinePlayer(targetID, out var onlinePlayer)) {
+            Logger.Debug("Player {0} tried to teleport to character ID {1}, but the character is not online.",
+                Logger.Args(GetActiveWizard().PlayerNameBehavior.GetWizardName(), targetID));
+
+            SendToSocket(new GAME_5_PROTOCOL.MSG_GOTOPLAYERRESP {
+                Error = 1
+            });
+
+            return;
+        }
+
+        // Query for the target's Wizard so that we may get their X/Y/Z coordinates.
+        var queryResult = Context.ActorSelection(onlinePlayer.ActorPath)
+            .Ask<CHARACTER_103_PROTOCOL.MSG_CHARACTER>(
+                message: new CHARACTER_103_PROTOCOL.MSG_QUERYACTIVEWIZARD(),
+                timeout: TimeSpan.FromSeconds(QUERY_TELEPORT_WIZARD_TIMEOUT_IN_SECONDS)
+            )
+            .Result;
+
+        if (queryResult is not null) {
+            var coordinates = Util.GetCompactStringFromVector((Vector4) queryResult.Wizard.Location);
+
+            Teleport(
+                destinationZone: onlinePlayer.CurrentZone,
+                destinationLocation: coordinates,
+                doTeleportEffects: true,
+                ownerCharId: targetID
+            );
+        } else {
+            Logger.Error("Failed to query the target wizard for teleportation.");
+        }
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_IGNOREADD))]
+    private void ReceiveIgnoreAdd(GAME_5_PROTOCOL.MSG_IGNOREADD message) {
+        // A player wants to ignore another player.
+        var wizard = GetActiveWizard();
+        var targetCharID = message.CharacterGID;
+
+        if (targetCharID == 0 || targetCharID == wizard.CharId) {
+            return;
+        }
+
+        if (!wizard.IgnorePlayer(targetCharID)) {
+            Logger.Error("{0} tried to ignore character ID {1}, but they are already ignored.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), targetCharID));
+
+            return;
+        }
+
+        // Send the updated ignore list as a single-entry confirmation.
+        // The client expects MSG_IGNORELIST with Add=1 to confirm individual additions.
+        SendIgnoreListConfirmation(wizard, add: true);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_IGNOREDROP))]
+    private void ReceiveIgnoreDrop(GAME_5_PROTOCOL.MSG_IGNOREDROP message) {
+        // A player wants to unignore another player.
+        var wizard = GetActiveWizard();
+        var targetCharID = message.CharacterGID;
+
+        if (!wizard.UnignorePlayer(targetCharID)) {
+            Logger.Error("{0} tried to unignore character ID {1}, but they are not ignored.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName(), targetCharID));
+
+            return;
+        }
+
+        // Send the full updated ignore list so the client refreshes.
+        SendIgnoreListConfirmation(wizard, add: false);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_IGNORELIST))]
+    private void ReceiveIgnoreList(GAME_5_PROTOCOL.MSG_IGNORELIST message) {
+        // A player is requesting a list of all the players they have ignored.
+        var wizard = GetActiveWizard();
+        SendIgnoreListConfirmation(wizard, add: false);
+    }
+
+    /// Send the serialized ignore list to the client.
+    /// <param name="add">When true, sends as a single-entry confirmation (Add=1);
+    /// when false, sends the full list (Add=0).</param>
+    private void SendIgnoreListConfirmation(Wizard wizard, bool add) {
+        var ignoredList = wizard.FriendsBehavior.GetIgnoredPlayers(wizard.CharId);
+
+        var serializer = new ObjectSerializer(
+            Versionable: false,
+            Behaviors: SerializerFlags.None
+        );
+
+        if (!serializer.Serialize(ignoredList, 1, out var listBytes)) {
+            Logger.Error("Player {0} requested their ignore list, but the serialization failed.",
+                Logger.Args(wizard.PlayerNameBehavior.GetWizardName()));
+
+            return;
+        }
+
+        var msg = new GAME_5_PROTOCOL.MSG_IGNORELIST {
+            ListOwnerGID = wizard.GameObjectID,
+            ListData = listBytes,
+            Add = add ? (byte)1 : (byte)0
+        };
+        SendToSocket(msg);
+    }
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_CLIENT_DISCONNECT))]
+    private void ReceiveClientDisconnect()
+        => InformBuddiesOfStatusChange(false);
+
+    [MessageHandler(typeof(GAME_5_PROTOCOL.MSG_QUERY_LOGOUT))]
+    private void ReceiveQueryLogout(GAME_5_PROTOCOL.MSG_QUERY_LOGOUT message)
+        => InformBuddiesOfStatusChange(false);
+
+    private void SendBuddyEntry(Wizard buddy, Relationship relationship, Wizard owner) {
+        // Check if this buddy is online.
+        var isOnline = TryGetOnlinePlayer(buddy.CharId, out var onlinePlayer);
+        var buddyHexName = buddy.PlayerNameBehavior.GetWizardNameAsByteHexString();
+        var buddyByteName = DataManipulation.SpacedHexStringToBytes(buddyHexName);
+
+        // Log
+        var ownerName = GetActiveWizard().PlayerNameBehavior.GetWizardName();
+        var statusMessage = isOnline ? "online" : "offline";
+        var buddyWizardName = buddy.PlayerNameBehavior.GetWizardName();
+        Logger.Debug("{0} has a friend named {1} (Hex: {2}) (ID: {3}) who is {4}.",
+            Logger.Args(ownerName, buddyWizardName, buddyHexName, buddy.CharId, statusMessage));
+
+        var buddyMsg = new GAME_5_PROTOCOL.MSG_BUDDYENTRY {
+            ListOwnerGID = owner.GameObjectID,
+            EntryGID = buddy.CharId,
+            GameObjectID = buddy.GameObjectID,
+            Name = buddyByteName,
+            Status = isOnline ? ONLINE_STATUS_CODE : OFFLINE_STATUS_CODE,
+            FriendInfo = BuildFriendInfo(buddy, relationship.GetFriendSymbol(owner.CharId)),
+            PasswordChat = 0,                                         // TODO: What is this?
+            Permissions = (uint) buddy.Account.GetAccountFlags(),
+            ZoneName = onlinePlayer?.CurrentZoneDisplayName ?? string.Empty,
+            RealmName = onlinePlayer?.CurrentRealm ?? string.Empty,
+            Locale = 0,
+            FriendDate = relationship.RelationshipEpochInSeconds,
+            FriendStatusDate = relationship.RelationshipEpochInSeconds,
+            PreviousName = string.Empty                               // TODO: Implement this
+        };
+        SendToSocket(buddyMsg);
+    }
+
+    private void SendBuddyListEnd(Wizard wizard) {
+        var completeMsg = new GAME_5_PROTOCOL.MSG_BUDDYLISTCOMPLETE {
+            ListOwnerGID = wizard.GameObjectID
+        };
+        SendToSocket(completeMsg);
+    }
+
+    private void InformBuddiesOfStatusChange(bool isOnline) {
+        var ownerWizard = GetActiveWizard();
+        if (ownerWizard is null) {
+            return;
+        }
+        var charID = ownerWizard.CharId;
+
+        // Inform all buddies of the status change.
+        var buddies = BuddyRelationshipCollection.GetBuddiesForWizard(charID);
+        foreach (var buddy in buddies.Where(buddy => buddy != null)) {
+            if (TryGetOnlinePlayer(buddy.CharId, out var onlinePlayer)) {
+                var buddyStatusMsg = new GAME_5_PROTOCOL.MSG_BUDDYSTATUSUPDATE {
+                    ListOwnerGID = buddy.GameObjectID,
+                    EntryGID = charID,
+                    Status = isOnline ? ONLINE_STATUS_CODE : OFFLINE_STATUS_CODE,
+                    ZoneName = onlinePlayer.CurrentZoneDisplayName,
+                    RealmName = onlinePlayer.CurrentRealm
+                };
+                var buddyActorPath = onlinePlayer.ActorPath;
+                Context.ActorSelection(buddyActorPath).Tell(buddyStatusMsg);
+            }
+        }
+    }
+
+    private static uint BuildFriendInfo(Wizard buddy, byte friendSymbol) {
+        // The client unpacks this as level (high 16 bits), school (next byte) and best friend symbol (low byte).
+        var level = (uint) Math.Clamp(buddy.MagicSchoolBehavior.Level, 0, ushort.MaxValue);
+        var school = MagicSchoolIndex.ToSocialIndex(buddy.MagicSchoolBehavior.MagicSchool);
+
+        return (level << 16) | (school << 8) | friendSymbol;
+    }
+
+    private static void SendStoredBuddyStats(GAME_5_PROTOCOL.MSG_BUDDYSTATS request,
+                                             ulong buddyCharID,
+                                             IActorRef requester,
+                                             ulong targetCharacterGid) {
+        var storedBuddy = WizardCollection.GetCharacter(buddyCharID);
+        if (storedBuddy is null) {
+            Logger.Warning("Stats were requested for character ID {CharId}, but the character was not found.",
+                Logger.Args(buddyCharID));
+
+            return;
+        }
+
+        // The database keeps no stats or effects, so rebuild them the way a login does.
+        CharacterHelper.RecalculateGameStats(storedBuddy);
+        SendBuddyStats(storedBuddy, request, requester, targetCharacterGid);
+    }
+
+    private static void SendBuddyStats(Wizard buddy,
+                                       GAME_5_PROTOCOL.MSG_BUDDYSTATS request,
+                                       IActorRef requester,
+                                       ulong targetCharacterGid) {
+        var reply = BuddyStatsBuilder.Build(buddy, request, targetCharacterGid);
+        requester.Tell(reply);
+
+        Logger.Debug("Sent stats for {Name} (ID {CharId}). Block flags: stats {Stat}, avatar {Char}, "
+            + "equipment {Equip}, effects {Effect}, pet {Pet}, wishlist {Wishlist}.",
+            Logger.Args(buddy.PlayerNameBehavior.GetWizardName(), buddy.CharId, reply.StatBlockCRC, reply.CharBlockCRC,
+                reply.EquipBlockCRC, reply.EffectBlockCRC, reply.PetStatBlockCRC, reply.WishlistBlockCRC));
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (ulong CharId, DateTime CreatedAt)> s_friendFinderCodes = new();
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_REQUESTFRIENDFINDERCODE))]
+    private void ReceiveRequestFriendFinderCode(WIZARD_12_PROTOCOL.MSG_REQUESTFRIENDFINDERCODE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var codeChars = new char[6];
+        for (int i = 0; i < codeChars.Length; i++) {
+            codeChars[i] = chars[Random.Shared.Next(chars.Length)];
+        }
+        var code = new string(codeChars);
+        s_friendFinderCodes[code] = (wizard.CharId, DateTime.UtcNow);
+
+        var hexName = wizard.PlayerNameBehavior.GetWizardNameAsByteHexString();
+        var byteName = DataManipulation.SpacedHexStringToBytes(hexName);
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_SENDFRIENDFINDERCODE {
+            Code = code,
+            Error = 0,
+            PackedName = byteName,
+            IsRequester = 1,
+            ListOwnerGID = wizard.GameObjectID
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_USEFRIENDFINDERCODE))]
+    private void ReceiveUseFriendFinderCode(WIZARD_12_PROTOCOL.MSG_USEFRIENDFINDERCODE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var codeStr = message.Code.ToString().Trim().ToUpperInvariant();
+        if (!s_friendFinderCodes.TryRemove(codeStr, out var entry) || entry.CharId == wizard.CharId) {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_USEFRIENDFINDERCODERESPONSE {
+                BuddyName = string.Empty,
+                Code = message.Code,
+                Error = "Invalid or expired True Friend Code.",
+                Forwarded = 0,
+                ListOwnerGID = wizard.GameObjectID
+            });
+            return;
+        }
+
+        var friendCharId = entry.CharId;
+        var friendWizard = WizardCollection.GetCharacter(friendCharId);
+        if (friendWizard is null) {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_USEFRIENDFINDERCODERESPONSE {
+                BuddyName = string.Empty,
+                Code = message.Code,
+                Error = "Character not found.",
+                Forwarded = 0,
+                ListOwnerGID = wizard.GameObjectID
+            });
+            return;
+        }
+
+        wizard.AddOrRepairRelationship(friendCharId);
+        WizardCollection.UpdateCharacterFriendBehavior(wizard);
+
+        friendWizard.AddOrRepairRelationship(wizard.CharId);
+        WizardCollection.UpdateCharacterFriendBehavior(friendWizard);
+
+        var friendHexName = friendWizard.PlayerNameBehavior.GetWizardNameAsByteHexString();
+        var friendByteName = DataManipulation.SpacedHexStringToBytes(friendHexName);
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_USEFRIENDFINDERCODERESPONSE {
+            BuddyName = friendByteName,
+            Code = message.Code,
+            Error = string.Empty,
+            Forwarded = 0,
+            ListOwnerGID = wizard.GameObjectID
+        });
+
+        if (wizard.FriendsBehavior.TryGetRelationship(friendCharId, out var rel)) {
+            SendBuddyEntry(friendWizard, rel, wizard);
+            SendBuddyListEnd(wizard);
+        }
+
+        if (TryGetOnlinePlayer(friendCharId, out var onlineFriend)) {
+            if (friendWizard.FriendsBehavior.TryGetRelationship(wizard.CharId, out var friendRel)) {
+                var fwdMsg = new CHARACTER_103_PROTOCOL.MSG_BUDDYREQUESTREPLYFWD {
+                    RequesterCharId = friendCharId,
+                    RecipientCharId = wizard.CharId,
+                    Accept = true,
+                    NewRelationship = friendRel
+                };
+                Context.ActorSelection(onlineFriend.ActorPath).Tell(fwdMsg);
+            }
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_SETDONTALLOWFRIENDFINDERCODES))]
+    private void ReceiveSetDontAllowFriendFinderCodes(WIZARD_12_PROTOCOL.MSG_SETDONTALLOWFRIENDFINDERCODES message) {
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_SETDONTALLOWFRIENDFINDERCODES {
+            DontAllowFriendFinderCodes = message.DontAllowFriendFinderCodes
+        });
+    }
+
+}

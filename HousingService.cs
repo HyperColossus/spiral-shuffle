@@ -166,4 +166,84 @@ internal sealed class HousingService(SessionActor sessionActor) : MessageService
             ItemCount = 0
         });
     }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICCHANGEACTION))]
+    private void ReceiveCastleMagicChangeAction(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICCHANGEACTION message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICCHANGEACTION {
+            GlobalID = message.GlobalID,
+            ActionNumber = message.ActionNumber,
+            SpellTemplateID = message.SpellTemplateID,
+            TargetTemplateID = message.TargetTemplateID,
+            LocX = message.LocX,
+            LocY = message.LocY,
+            LocZ = message.LocZ
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTUSE))]
+    private void ReceiveCastleMagicRequestUse(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTUSE message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICUPDATESTATE {
+            GlobalID = message.ItemGID,
+            State = 1,
+            RandomNumbers = (uint) Random.Shared.Next(1, 100)
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICUPDATESTATE))]
+    private void ReceiveCastleMagicUpdateState(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICUPDATESTATE message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICORB))]
+    private void ReceiveCastleMagicOrb(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICORB message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICORB {
+            OrbFlags = message.OrbFlags
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICCURRENTSTATE))]
+    private void ReceiveCastleMagicCurrentState(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICCURRENTSTATE message) {
+        SendToSocket(message);
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWMOUNTS))]
+    private void ReceiveCastleMagicAllowMounts(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWMOUNTS message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWMOUNTS {
+            State = message.State
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWPVP))]
+    private void ReceiveCastleMagicAllowPvP(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWPVP message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTALLOWPVP {
+            State = message.State
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTPLAYERTELEPORT))]
+    private void ReceiveCastleMagicPlayerTeleport(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICREQUESTPLAYERTELEPORT message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        SendToSocket(new GAME_5_PROTOCOL.MSG_SERVERTELEPORT {
+            LocationX = (ushort) (message.LocX / 4.0f),
+            LocationY = (ushort) (message.LocY / 4.0f),
+            LocationZ = (ushort) (message.LocZ / 4.0f),
+            Direction = (byte) (message.Yaw / Math.PI / 2 * 250),
+            MobileID = (ushort) (message.TargetPlayerGID > 0 ? (message.TargetPlayerGID & 0xFFFF) : (wizard.GameObjectID & 0xFFFF))
+        });
+    }
+
+    [MessageHandler(typeof(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICTUTORIAL))]
+    private void ReceiveCastleMagicTutorial(WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICTUTORIAL message) {
+        SendToSocket(new WIZARDHOUSING_50_PROTOCOL.MSG_CASTLEMAGICTUTORIAL {
+            State = message.State
+        });
+    }
 }

@@ -1116,6 +1116,262 @@ def main() -> None:
     shutil.copy2(ROOT / "DailyQuestService.cs", SOURCE / "Game/Services/DailyQuestService.cs")
     shutil.copy2(ROOT / "MonstrologyService.cs", SOURCE / "Game/Services/MonstrologyService.cs")
     shutil.copy2(ROOT / "CastleToursService.cs", SOURCE / "Game/Services/CastleToursService.cs")
+    shutil.copy2(ROOT / "ClientService.cs", SOURCE / "Game/Services/ClientService.cs")
+    shutil.copy2(ROOT / "CantripService.cs", SOURCE / "Game/Services/CantripService.cs")
+    shutil.copy2(ROOT / "FriendsService.cs", SOURCE / "Game/Services/FriendsService.cs")
+    shutil.copy2(ROOT / "SpellBookService.cs", SOURCE / "Game/Services/SpellBookService.cs")
+    replace("Shared/Behaviors/ServerFriendBehavior.cs", """    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() 
+        => throw new NotImplementedException();""", "    BehaviorInstance IClientBehaviorProvider<BehaviorInstance>.GetClientBehaviorInstance() => null!;")
+    replace("Shared/Behaviors/ServerQuestBehavior.cs", """    public ServerQuestBehavior GetClientBehaviorInstance()
+        => throw new NotImplementedException();""", "    public ServerQuestBehavior GetClientBehaviorInstance() => null!;")
+    replace("Game/Zone/Components/PathMovementComponent.cs", """        throw new NotImplementedException($"Path type {_pathType} is not implemented.");""", "        return _nodes.Count > 0 ? _nodes[0] : null;")
+    replace("Game/Services/PetService.cs", """        // TODO: validate gold cost against message.Gold
+        // For now, just hatch immediately.
+        HatchEgg(wizard, egg);""", """        if (message.Gold > 0) {
+            if (wizard.GameStats.m_currentGold < (int) message.Gold) {
+                return;
+            }
+            wizard.AddGold(-(int) message.Gold);
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEGOLD {
+                Gold = wizard.GameStats.m_currentGold,
+                MaxGold = wizard.GameStats.m_baseGoldPouch
+            });
+        }
+        HatchEgg(wizard, egg);""")
+    replace("Game/Services/QuestService.cs", """        try {
+            return zoneActor.Ask<ZONE_102_PROTOCOL.MSG_QUERYINSTANCEQUESTSRSP>(
+                new ZONE_102_PROTOCOL.MSG_QUERYINSTANCEQUESTS(), INSTANCE_QUERY_TIMEOUT).Result;
+        }
+        catch (Exception ex) {
+            Logger.Error("Instance quest query failed: {0}", Logger.Args(ex.Message));
+
+            return null;
+        }
+    }
+
+}""", """        try {
+            return zoneActor.Ask<ZONE_102_PROTOCOL.MSG_QUERYINSTANCEQUESTSRSP>(
+                new ZONE_102_PROTOCOL.MSG_QUERYINSTANCEQUESTS(), INSTANCE_QUERY_TIMEOUT).Result;
+        }
+        catch (Exception ex) {
+            Logger.Error("Instance quest query failed: {0}", Logger.Args(ex.Message));
+
+            return null;
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_QUESTFINDEROPTION))]
+    private void ReceiveQuestFinderOption(WIZARD_12_PROTOCOL.MSG_QUESTFINDEROPTION message) {
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_QUESTFINDEROPTION {
+            Enable = message.Enable
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD3_56_PROTOCOL.MSG_REQUESTQUESTFRIENDFINDER))]
+    private void ReceiveRequestQuestFriendFinder(WIZARD3_56_PROTOCOL.MSG_REQUESTQUESTFRIENDFINDER message) {
+        var wizard = GetActiveWizard();
+        SendToSocket(new WIZARD3_56_PROTOCOL.MSG_REQUESTQUESTFRIENDFINDER {
+            PlayerGID = wizard?.GameObjectID ?? message.PlayerGID,
+            Status = 1,
+            QuestPlayerGID = message.QuestPlayerGID,
+            Level = wizard?.MagicSchoolBehavior?.Level ?? 1,
+            School = wizard?.MagicSchoolBehavior?.MagicSchool.ToString() ?? "Fire"
+        });
+    }
+
+}""")
+    replace("Game/Combat/CombatDuelSubCircle.cs", """    internal void DoPipGain() {
+        // If the participant has the maximum amount of pips, do not gain any more.
+        var genericPips = CombatParticipant.m_pipCount.m_genericPips;
+        var powerPips = CombatParticipant.m_pipCount.m_powerPips;
+        if (genericPips + powerPips >= MAX_PIP_COUNT) {
+            return;
+        }
+
+        var gainedPowerPip = DeterminePowerPipGain(CombatParticipant);
+        if (gainedPowerPip) {
+            CombatParticipant.m_pipCount.m_powerPips++;
+        }
+        else {
+            CombatParticipant.m_pipCount.m_genericPips++;
+        }
+    }""", """    internal void DoPipGain() {
+        var genericPips = CombatParticipant.m_pipCount.m_genericPips;
+        var powerPips = CombatParticipant.m_pipCount.m_powerPips;
+        var schoolPips = TotalSchoolPips();
+        if (genericPips + powerPips + schoolPips >= MAX_PIP_COUNT) {
+            return;
+        }
+
+        var gainedPowerPip = DeterminePowerPipGain(CombatParticipant);
+        if (gainedPowerPip) {
+            CombatParticipant.m_pipCount.m_powerPips++;
+        }
+        else {
+            CombatParticipant.m_pipCount.m_genericPips++;
+        }
+
+        ConvertArchmasteryPip();
+        AdvanceShadowPips();
+    }
+
+    internal int TotalSchoolPips() {
+        var p = CombatParticipant.m_pipCount;
+        return p.m_firePips + p.m_icePips + p.m_stormPips + p.m_mythPips + p.m_lifePips + p.m_deathPips + p.m_balancePips;
+    }
+
+    internal void ConvertArchmasteryPip() {
+        var p = CombatParticipant.m_pipCount;
+        if (p.m_powerPips > 0 && CombatParticipant.m_archmasterySchool > 0) {
+            p.m_powerPips--;
+            switch ((MagicSchool) CombatParticipant.m_archmasterySchool) {
+                case MagicSchool.Fire: p.m_firePips++; break;
+                case MagicSchool.Ice: p.m_icePips++; break;
+                case MagicSchool.Storm: p.m_stormPips++; break;
+                case MagicSchool.Myth: p.m_mythPips++; break;
+                case MagicSchool.Life: p.m_lifePips++; break;
+                case MagicSchool.Death: p.m_deathPips++; break;
+                case MagicSchool.Balance: p.m_balancePips++; break;
+                default: p.m_powerPips++; break;
+            }
+        }
+    }
+
+    internal void AdvanceShadowPips() {
+        if (ParticipantGameStats.m_shadowPipRating > 0 || ParticipantGameStats.m_shadowPipBonusPercent > 0) {
+            CombatParticipant.m_roundsSinceShadowPip++;
+            if (CombatParticipant.m_roundsSinceShadowPip >= 3 && CombatParticipant.m_pipCount.m_shadowPips < 2) {
+                CombatParticipant.m_pipCount.m_shadowPips++;
+                CombatParticipant.m_roundsSinceShadowPip = 0;
+            }
+        }
+    }""")
+    replace("Game/Combat/CombatDuelSubCircle.cs", """    internal bool HasPipsForSpell(Spell spell) {
+        // X-pip spells scale to any pip count; no fixed minimum.
+        if (CombatActionResolver.IsXPipSpell(spell)) {
+            return true;
+        }
+
+        var spellRank = spell.m_pipCost.m_spellRank;
+        var genericPips = CombatParticipant.m_pipCount.m_genericPips;
+        var powerPips = CombatParticipant.m_pipCount.m_powerPips;
+        var isMastered = HasSchoolMastery(spell.m_magicSchoolID);
+
+        // Power pips count as 2 generic pips if the spell is mastered.
+        var totalPips = isMastered
+            ? genericPips + (powerPips * 2)
+            : genericPips + powerPips;
+
+        return totalPips >= spellRank;
+    }""", """    internal bool HasPipsForSpell(Spell spell) {
+        if (CombatActionResolver.IsXPipSpell(spell)) {
+            return true;
+        }
+
+        var spellRank = spell.m_pipCost.m_spellRank;
+        var school = (MagicSchool) spell.m_magicSchoolID;
+        var genericPips = CombatParticipant.m_pipCount.m_genericPips;
+        var powerPips = CombatParticipant.m_pipCount.m_powerPips;
+        var schoolPips = GetSchoolPips(school);
+        var isMastered = HasSchoolMastery(spell.m_magicSchoolID);
+
+        var totalPips = (isMastered ? (powerPips * 2) : powerPips) + (schoolPips * 2) + genericPips;
+
+        return totalPips >= spellRank;
+    }
+
+    internal int GetSchoolPips(MagicSchool school) => school switch {
+        MagicSchool.Fire => CombatParticipant.m_pipCount.m_firePips,
+        MagicSchool.Ice => CombatParticipant.m_pipCount.m_icePips,
+        MagicSchool.Storm => CombatParticipant.m_pipCount.m_stormPips,
+        MagicSchool.Myth => CombatParticipant.m_pipCount.m_mythPips,
+        MagicSchool.Life => CombatParticipant.m_pipCount.m_lifePips,
+        MagicSchool.Death => CombatParticipant.m_pipCount.m_deathPips,
+        MagicSchool.Balance => CombatParticipant.m_pipCount.m_balancePips,
+        _ => 0
+    };""")
+    replace("Game/Combat/CombatDuelSubCircle.cs", """    internal void DeductPips(MagicSchool school, byte spellRank) {
+        var isMastered = HasSchoolMastery((uint) school);
+        var pipCount = CombatParticipant.m_pipCount;
+
+        // Deduct pips based on the spell rank.
+        // We have a second conditional here incase of byte overflow.
+        while (spellRank is > 0 and < (MAX_PIP_COUNT * 2)) {
+            if (isMastered && pipCount.m_powerPips > 0) {
+                pipCount.m_powerPips--;
+                spellRank -= 2;
+            }
+            else if (!isMastered && pipCount.m_powerPips > 0) {
+                pipCount.m_powerPips--;
+                spellRank--;
+            }
+            else if (pipCount.m_powerPips == 0 && pipCount.m_genericPips > 0) {
+                pipCount.m_genericPips--;
+                spellRank--;
+            }
+            else if (pipCount.m_powerPips == 0 && pipCount.m_genericPips == 0) {
+                break;
+            }
+        }
+    }
+
+    internal void DeductAllPips() {
+        var ourPipCount = CombatParticipant.m_pipCount;
+        ourPipCount.m_powerPips = 0;
+        ourPipCount.m_genericPips = 0;
+    }""", """    internal void DeductPips(MagicSchool school, byte spellRank) {
+        var isMastered = HasSchoolMastery((uint) school);
+        var pipCount = CombatParticipant.m_pipCount;
+
+        while (spellRank is > 0 and < (MAX_PIP_COUNT * 2)) {
+            if (TryDeductSchoolPip(school)) {
+                spellRank = spellRank >= 2 ? (byte)(spellRank - 2) : (byte)0;
+            }
+            else if (isMastered && pipCount.m_powerPips > 0) {
+                pipCount.m_powerPips--;
+                spellRank = spellRank >= 2 ? (byte)(spellRank - 2) : (byte)0;
+            }
+            else if (!isMastered && pipCount.m_powerPips > 0) {
+                pipCount.m_powerPips--;
+                spellRank--;
+            }
+            else if (pipCount.m_genericPips > 0) {
+                pipCount.m_genericPips--;
+                spellRank--;
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    private bool TryDeductSchoolPip(MagicSchool school) {
+        var p = CombatParticipant.m_pipCount;
+        switch (school) {
+            case MagicSchool.Fire when p.m_firePips > 0: p.m_firePips--; return true;
+            case MagicSchool.Ice when p.m_icePips > 0: p.m_icePips--; return true;
+            case MagicSchool.Storm when p.m_stormPips > 0: p.m_stormPips--; return true;
+            case MagicSchool.Myth when p.m_mythPips > 0: p.m_mythPips--; return true;
+            case MagicSchool.Life when p.m_lifePips > 0: p.m_lifePips--; return true;
+            case MagicSchool.Death when p.m_deathPips > 0: p.m_deathPips--; return true;
+            case MagicSchool.Balance when p.m_balancePips > 0: p.m_balancePips--; return true;
+            default: return false;
+        }
+    }
+
+    internal void DeductAllPips() {
+        var ourPipCount = CombatParticipant.m_pipCount;
+        ourPipCount.m_powerPips = 0;
+        ourPipCount.m_genericPips = 0;
+        ourPipCount.m_firePips = 0;
+        ourPipCount.m_icePips = 0;
+        ourPipCount.m_stormPips = 0;
+        ourPipCount.m_mythPips = 0;
+        ourPipCount.m_lifePips = 0;
+        ourPipCount.m_deathPips = 0;
+        ourPipCount.m_balancePips = 0;
+        ourPipCount.m_shadowPips = 0;
+    }""")
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
