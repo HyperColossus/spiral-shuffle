@@ -1017,6 +1017,44 @@ def patch_bazaar_system() -> None:
     replace("Game/Services/AuctionHouseService.cs", old_confirm_buy, new_confirm_sell)
 
 
+def patch_pet_hatching() -> None:
+    old_hatch = "    [MessageHandler(typeof(PET_9_PROTOCOL.MSG_HATCHEGGNOW))]"
+    new_hatch = """    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_PETHATCHREQUEST))]
+    private void ReceivePetHatchRequest(WIZARD_12_PROTOCOL.MSG_PETHATCHREQUEST message) {
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_PETHATCHRESULT {
+            TargetGID = message.TargetGID,
+            Status = 1
+        });
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_PETHATCHCREATE {
+            TargetGID = message.TargetGID
+        });
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_REQUESTHATCHMAKINGHATCH))]
+    private void ReceiveHatchmakingHatch(WIZARD2_53_PROTOCOL.MSG_REQUESTHATCHMAKINGHATCH message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        if (wizard.GameStats.m_currentGold >= 25000) {
+            wizard.AddGold(-25000);
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_UPDATEGOLD {
+                Gold = wizard.GameStats.m_currentGold
+            });
+        }
+
+        uint childTemplate = 100334;
+        var egg = wizard.PetOwnerBehavior.CreatePetEgg(childTemplate, 300);
+
+        SendEggCreatedMessages(egg);
+        StartEggTimer(egg);
+
+        Logger.Information("Pet hatching initiated! Created egg {0}", Logger.Args(egg.m_globalID));
+    }
+
+    [MessageHandler(typeof(PET_9_PROTOCOL.MSG_HATCHEGGNOW))]"""
+    replace("Game/Services/PetService.cs", old_hatch, new_hatch)
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -1037,10 +1075,14 @@ def main() -> None:
     patch_crafting_system()
     patch_pvp_system()
     patch_bazaar_system()
+    patch_pet_hatching()
     shutil.copy2(ROOT / "BankService.cs", SOURCE / "Game/Services/BankService.cs")
     shutil.copy2(ROOT / "InteractSeamstressComponent.cs", SOURCE / "Game/Zone/Components/InteractSeamstressComponent.cs")
     shutil.copy2(ROOT / "CraftingService.cs", SOURCE / "Game/Services/CraftingService.cs")
     shutil.copy2(ROOT / "TradeService.cs", SOURCE / "Game/Services/TradeService.cs")
+    shutil.copy2(ROOT / "HousingService.cs", SOURCE / "Game/Services/HousingService.cs")
+    shutil.copy2(ROOT / "GardeningService.cs", SOURCE / "Game/Services/GardeningService.cs")
+    shutil.copy2(ROOT / "FishingService.cs", SOURCE / "Game/Services/FishingService.cs")
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
@@ -1065,7 +1107,7 @@ def main() -> None:
     shutil.copy2(ROOT / "CrownShopModels.cs", SOURCE / "Game/CrownShop/CrownShopModels.cs")
     shutil.copy2(ROOT / "CrownShopHandler.cs", SOURCE / "Game/CrownShop/CrownShopHandler.cs")
     shutil.copy2(ROOT / "CrownShopService.cs", SOURCE / "Game/Services/CrownShopService.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),\n        typeof(CraftingService),\n        typeof(TradeService),")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),\n        typeof(CraftingService),\n        typeof(TradeService),\n        typeof(HousingService),\n        typeof(GardeningService),\n        typeof(FishingService),")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
