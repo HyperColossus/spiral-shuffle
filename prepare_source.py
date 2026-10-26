@@ -407,6 +407,20 @@ def patch_bank_system() -> None:
         return true;
     }
 
+    public static bool UpdateItem(WizClientObjectItem item) {
+        using var session = s_store.OpenSession();
+        var associatedItem = session.Query<WizClientObjectItem>(collectionName: CollectionName)
+            .FirstOrDefault(x => x.m_globalID == item.m_globalID);
+        if (associatedItem == null) return false;
+        associatedItem.m_inactiveBehaviors = item.m_inactiveBehaviors;
+        associatedItem.m_primaryColor = item.m_primaryColor;
+        associatedItem.m_secondaryColor = item.m_secondaryColor;
+        associatedItem.m_pattern = item.m_pattern;
+        associatedItem.m_displayID = item.m_displayID;
+        session.SaveChanges();
+        return true;
+    }
+
     public static bool DeleteInventory(ulong playerID) {""")
 
 
@@ -539,6 +553,470 @@ using Akka.Actor;""")
     replace("Game/Services/InventoryService.cs", old_feed, new_feed)
 
 
+def patch_jewel_system() -> None:
+    old_jewels = """    #region Jewels
+
+    // JEWELS
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST))]
+    private void ReceiveEquipJewelRequest(WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST message) {
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST() {
+            ItemGID = message.ItemGID,
+            JewelGID = message.JewelGID,
+            SocketNumber = message.SocketNumber,
+        });
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELTOITEM() {
+            ItemGID = message.ItemGID,
+            JewelGID = message.JewelGID,
+            SocketNumber = message.SocketNumber,
+            GlobalID = RandomGen.GenerateGUID()
+        });
+    }
+
+    #endregion"""
+
+    new_jewels = """    #region Jewels
+
+    // JEWELS
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST))]
+    private void ReceiveEquipJewelRequest(WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var targetItem = wizard.InventoryBehavior?.GetItem(message.ItemGID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.ItemGID);
+        var jewelItem = wizard.InventoryBehavior?.GetItem(message.JewelGID);
+
+        if (targetItem is null || jewelItem is null) {
+            Logger.Log.Warning("Jewel equip request invalid: target={0}, jewel={1}",
+                Logger.Args(message.ItemGID, message.JewelGID));
+            return;
+        }
+
+        uint jewelTemplateId = (uint) jewelItem.m_templateID.Full;
+
+        // Consume jewel from inventory
+        wizard.RemoveItemFromInventory(message.JewelGID);
+        SendToSocket(new GAME_5_PROTOCOL.MSG_INVENTORYBEHAVIOR_REMOVEITEM() {
+            ItemID = message.JewelGID
+        });
+
+        // Add or update ClientJewelSocketBehavior on target item
+        targetItem.m_inactiveBehaviors ??= [];
+        var socketBeh = targetItem.m_inactiveBehaviors.OfType<ClientJewelSocketBehavior>().FirstOrDefault();
+        if (socketBeh is null) {
+            socketBeh = new ClientJewelSocketBehavior {
+                m_behaviorTemplateNameID = 0x5CEF62AC,
+                m_publicJewelInfo = new PublicEquippedJewelInfo {
+                    m_infoPairs = []
+                }
+            };
+            targetItem.m_inactiveBehaviors.Add(socketBeh);
+        }
+
+        socketBeh.m_publicJewelInfo ??= new PublicEquippedJewelInfo { m_infoPairs = [] };
+        socketBeh.m_publicJewelInfo.m_infoPairs ??= [];
+        socketBeh.m_publicJewelInfo.m_infoPairs.RemoveAll(p => p.m_socketNumber == message.SocketNumber);
+        socketBeh.m_publicJewelInfo.m_infoPairs.Add(new PublicSocketJewelPair {
+            m_socketNumber = message.SocketNumber,
+            m_jewelTemplateID = jewelTemplateId
+        });
+
+        WizardItemCollection.UpdateItem(targetItem);
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELREQUEST() {
+            ItemGID = message.ItemGID,
+            JewelGID = message.JewelGID,
+            SocketNumber = message.SocketNumber
+        });
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_EQUIPJEWELTOITEM() {
+            GlobalID = wizard.GameObjectID,
+            ItemGID = message.ItemGID,
+            JewelGID = message.JewelGID,
+            SocketNumber = message.SocketNumber
+        });
+
+        if (wizard.EquipmentBehavior?.GetItem(message.ItemGID) != null) {
+            EquipmentItemCards.Apply(wizard, targetItem);
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_UNSOCKETJEWELREQUEST))]
+    private void ReceiveUnsocketJewelRequest(WIZARD2_53_PROTOCOL.MSG_UNSOCKETJEWELREQUEST message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var targetItem = wizard.InventoryBehavior?.GetItem(message.ItemGID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.ItemGID);
+        if (targetItem is null) return;
+
+        var socketBeh = targetItem.m_inactiveBehaviors?.OfType<ClientJewelSocketBehavior>().FirstOrDefault();
+        if (socketBeh?.m_publicJewelInfo?.m_infoPairs != null) {
+            socketBeh.m_publicJewelInfo.m_infoPairs.RemoveAll(p => p.m_socketNumber == message.SocketNumber);
+            WizardItemCollection.UpdateItem(targetItem);
+        }
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_UNEQUIPSOCKETEDJEWEL() {
+            GlobalID = wizard.GameObjectID,
+            ItemGID = message.ItemGID,
+            SocketNumber = message.SocketNumber,
+            SocketDeleted = 1
+        });
+
+        if (wizard.EquipmentBehavior?.GetItem(message.ItemGID) != null) {
+            EquipmentItemCards.Apply(wizard, targetItem);
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD2_53_PROTOCOL.MSG_UNLOCKSOCKETS))]
+    private void ReceiveUnlockSockets(WIZARD2_53_PROTOCOL.MSG_UNLOCKSOCKETS message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var targetItem = wizard.InventoryBehavior?.GetItem(message.ItemGID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.ItemGID);
+        if (targetItem is null) return;
+
+        int unlockCost = 150;
+        if (message.CostChoice != 0 && wizard.Account.Crowns >= unlockCost) {
+            wizard.Account.SetCrowns(wizard.Account.Crowns - unlockCost);
+        }
+
+        targetItem.m_inactiveBehaviors ??= [];
+        var socketBeh = targetItem.m_inactiveBehaviors.OfType<ClientJewelSocketBehavior>().FirstOrDefault();
+        if (socketBeh is null) {
+            socketBeh = new ClientJewelSocketBehavior {
+                m_behaviorTemplateNameID = 0x5CEF62AC,
+                m_publicJewelInfo = new PublicEquippedJewelInfo {
+                    m_infoPairs = []
+                }
+            };
+            targetItem.m_inactiveBehaviors.Add(socketBeh);
+        }
+        socketBeh.m_publicJewelInfo ??= new PublicEquippedJewelInfo { m_infoPairs = [] };
+        socketBeh.m_publicJewelInfo.m_bSocketsLocked = false;
+        WizardItemCollection.UpdateItem(targetItem);
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_UNLOCKSOCKETSCONFIRM() {
+            Failure = 0,
+            WebFailure = 0,
+            Credits = wizard.Account.Crowns
+        });
+
+        SendToSocket(new WIZARD2_53_PROTOCOL.MSG_JEWELSOCKETLOCKUPDATE() {
+            GlobalID = wizard.GameObjectID,
+            ItemGID = message.ItemGID,
+            Locked = 0
+        });
+    }
+
+    #endregion"""
+    replace("Game/Services/InventoryService.cs", old_jewels, new_jewels)
+
+
+def patch_stitching_system() -> None:
+    old_done = """        var wizBangMsg = new GAME_5_PROTOCOL.MSG_WIZBANG() {
+            GameObjectID = wizard.GameObjectID,
+            WizBangID = (uint) WizBangs.None
+        };
+        ZoneBroadcast(wizBangMsg, false);
+    }"""
+
+    new_done = """        var wizBangMsg = new GAME_5_PROTOCOL.MSG_WIZBANG() {
+            GameObjectID = wizard.GameObjectID,
+            WizBangID = (uint) WizBangs.None
+        };
+        ZoneBroadcast(wizBangMsg, false);
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_STITCHITEMS))]
+    private void ReceiveStitchItems(WIZARD_12_PROTOCOL.MSG_STITCHITEMS message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        int cost = 100;
+        if (wizard.Account.Crowns < cost) {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_STITCHITEMSCONFIRM {
+                Failure = 1,
+                WebFailure = 0,
+                Credits = wizard.Account.Crowns
+            });
+            return;
+        }
+
+        var statItem = wizard.InventoryBehavior?.GetItem(message.StatsID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.StatsID);
+        var displayItem = wizard.InventoryBehavior?.GetItem(message.DisplayID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.DisplayID);
+
+        if (statItem is null || displayItem is null) {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_STITCHITEMSCONFIRM {
+                Failure = 2,
+                WebFailure = 0,
+                Credits = wizard.Account.Crowns
+            });
+            return;
+        }
+
+        wizard.Account.SetCrowns(wizard.Account.Crowns - cost);
+
+        statItem.m_displayID = displayItem.m_displayID.Full != 0 ? displayItem.m_displayID : displayItem.m_templateID;
+        statItem.m_primaryColor = displayItem.m_primaryColor;
+        statItem.m_secondaryColor = displayItem.m_secondaryColor;
+        statItem.m_pattern = displayItem.m_pattern;
+
+        wizard.RemoveItemFromInventory(displayItem.m_globalID);
+        SendToSocket(new GAME_5_PROTOCOL.MSG_INVENTORYBEHAVIOR_REMOVEITEM {
+            ItemID = displayItem.m_globalID
+        });
+
+        WizardItemCollection.UpdateItem(statItem);
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_STITCHITEMSCONFIRM {
+            Failure = 0,
+            WebFailure = 0,
+            Credits = wizard.Account.Crowns
+        });
+
+        if (wizard.EquipmentBehavior?.GetItem(statItem.m_globalID) != null) {
+            var template = (WizItemTemplate) CoreObjectFactory.GetCoreTemplate(statItem.m_templateID);
+            SendEquippedItemRefresh(wizard, statItem, template);
+        }
+    }
+
+    [MessageHandler(typeof(WIZARD_12_PROTOCOL.MSG_UNSTITCHITEMS))]
+    private void ReceiveUnstitchItems(WIZARD_12_PROTOCOL.MSG_UNSTITCHITEMS message) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        int cost = 100;
+        if (wizard.Account.Crowns < cost) {
+            SendToSocket(new WIZARD_12_PROTOCOL.MSG_STITCHITEMSCONFIRM {
+                Failure = 1,
+                WebFailure = 0,
+                Credits = wizard.Account.Crowns
+            });
+            return;
+        }
+
+        var item = wizard.InventoryBehavior?.GetItem(message.ItemID)
+            ?? wizard.EquipmentBehavior?.GetItem(message.ItemID);
+        if (item is null) return;
+
+        ulong appearanceTemplateId = item.m_displayID.Full != 0 ? item.m_displayID.Full : 0;
+
+        wizard.Account.SetCrowns(wizard.Account.Crowns - cost);
+
+        item.m_displayID = 0;
+        WizardItemCollection.UpdateItem(item);
+
+        if (appearanceTemplateId != 0) {
+            var restoredObj = CoreObjectFactory.FinalizeCoreObject(appearanceTemplateId);
+            if (restoredObj is WizClientObjectItem restoredItem) {
+                wizard.AddItemToInventory(restoredItem);
+                if (s_itemSerializer.Serialize(restoredItem, 1, out var restoredData)) {
+                    SendToSocket(new GAME_5_PROTOCOL.MSG_INVENTORYBEHAVIOR_ADDITEM {
+                        GlobalID = wizard.GameObjectID,
+                        SerializedItem = restoredData
+                    });
+                }
+                SendToSocket(new WIZARD2_53_PROTOCOL.MSG_ITEMACQUISITION {
+                    ItemGlobalID = restoredItem.m_globalID,
+                    ItemTemplateID = (uint) appearanceTemplateId,
+                    ItemLocation = 1
+                });
+            }
+        }
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_STITCHITEMSCONFIRM {
+            Failure = 0,
+            WebFailure = 0,
+            Credits = wizard.Account.Crowns
+        });
+
+        if (wizard.EquipmentBehavior?.GetItem(item.m_globalID) != null) {
+            var template = (WizItemTemplate) CoreObjectFactory.GetCoreTemplate(item.m_templateID);
+            SendEquippedItemRefresh(wizard, item, template);
+        }
+    }"""
+
+    replace("Game/Services/ShopService.cs", old_done, new_done)
+
+
+def patch_crafting_system() -> None:
+    pass
+
+
+def patch_pvp_system() -> None:
+    # 1. Allow players to join Team Monster slots when available
+    old_join = """        var subCircle = isPlayer ? ChoosePlayerSubCircle(participantObject) : GetAvailableSubCircleTeamCreature();
+        if (subCircle is null) {"""
+    new_join = """        var subCircle = isPlayer ? ChoosePlayerSubCircle(participantObject) : GetAvailableSubCircleTeamCreature();
+        if (subCircle is null && isPlayer && IsSlotAvailable(CombatTeam.Monster)) {
+            subCircle = GetAvailableSubCircleTeamCreature();
+        }
+        if (subCircle is null) {"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_join, new_join)
+
+    # 2. Allow players on Monster team to draw hands and receive MSG_COMBATHAND
+    old_hand = """    private void SendCombatHand() {
+        // Serialize the combat hand and send it to the participant, locally.
+        // We're skipping creatures for now.
+        EnactActionOnSubCircles(circle => {
+            if (circle.OccupiedTeam == CombatTeam.Monster) {
+                return;
+            }"""
+    new_hand = """    private void SendCombatHand() {
+        // Serialize the combat hand and send it to the participant, locally.
+        // We're skipping creatures for now.
+        EnactActionOnSubCircles(circle => {
+            if (circle._wizard is null && !circle.IsSummonedMinion) {
+                return;
+            }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_hand, new_hand)
+
+    # 3. Allow players on Monster team to receive current combat hand
+    old_cur_hand = """    internal void SendCurrentCombatHand(CombatDuelSubCircle circle) {
+        // As-is, no draw or refill, so a discarded slot stays visibly open for the vault draw.
+        if (circle is null || circle.OccupiedTeam == CombatTeam.Monster) {
+            return;
+        }"""
+    new_cur_hand = """    internal void SendCurrentCombatHand(CombatDuelSubCircle circle) {
+        // As-is, no draw or refill, so a discarded slot stays visibly open for the vault draw.
+        if (circle is null || (circle.OccupiedTeam == CombatTeam.Monster && circle._wizard is null)) {
+            return;
+        }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_cur_hand, new_cur_hand)
+
+    # 4. Handle telegraphs for any player caster
+    old_pass = """        if (caster.OccupiedTeam == CombatTeam.Player) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.Pass, null, 0);
+        }"""
+    new_pass = """        if (caster._wizard is not null) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.Pass, null, 0);
+        }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_pass, new_pass)
+
+    old_atk = """        // Minions are AI-driven; their telegraph comes from ResendMinionMoveSelections, not an echo.
+        if (!caster.IsSummonedMinion && caster.OccupiedTeam == CombatTeam.Player) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.Attack, spell, (byte) spellTarget);
+        }"""
+    new_atk = """        // Minions are AI-driven; their telegraph comes from ResendMinionMoveSelections, not an echo.
+        if (!caster.IsSummonedMinion && caster._wizard is not null) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.Attack, spell, (byte) spellTarget);
+        }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_atk, new_atk)
+
+    old_mind = """        // Echo the change mind action to each player participant
+        if (caster.OccupiedTeam == CombatTeam.Player) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.ChangeMind, null, 0);
+        }"""
+    new_mind = """        // Echo the change mind action to each player participant
+        if (caster._wizard is not null) {
+            SendCombatMoveSelection(caster.ParticipantObject.m_globalID, (byte) CombatMoveType.ChangeMind, null, 0);
+        }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_mind, new_mind)
+
+    # 5. Remove players from duel handles any player participant
+    old_rem = """    private void RemovePlayersFromDuel() => EnactActionOnSubCircles(circle => {
+        if (circle.OccupiedTeam != CombatTeam.Player) {
+            return;
+        }"""
+    new_rem = """    private void RemovePlayersFromDuel() => EnactActionOnSubCircles(circle => {
+        if (circle._wizard is null) {
+            return;
+        }"""
+    replace("Game/Zone/Components/CombatDuelComponent.cs", old_rem, new_rem)
+
+
+def patch_bazaar_system() -> None:
+    # 1. Seed default entries when collection is empty
+    old_init = """        if (s_entries is null) {
+            s_entries = [];
+        }
+
+        s_isInitialized = true;"""
+    new_init = """        if (s_entries is null || s_entries.Count == 0) {
+            s_entries = [];
+            ulong[] starterTemplates = [
+                10183, 10184, 10185, 10186, 10187, 10188, 10189, 10190, 10191, 10192
+            ];
+            foreach (var tid in starterTemplates) {
+                var entry = new AuctionHouseEntry {
+                    m_templateID = (Imcodec.Types.GID) tid,
+                    m_numForSale = 50,
+                    m_buyPrice = 50,
+                    m_sellPrice = 15
+                };
+                session.Store(entry);
+                s_entries.Add(entry);
+            }
+            session.SaveChanges();
+        }
+
+        s_isInitialized = true;"""
+    replace("WizardData/Collections/AuctionHouseCollection.cs", old_init, new_init)
+
+    # 2. Add Command 4, 5, 6, 9 to AuctionHouseService
+    old_switch = """            case 3:
+                BuyFromAuctionHouse(message.itemTemplateID, message.texture, message.decal, message.key);
+                break;
+            case 4:
+                // ?
+                break;
+            case 5:
+                // ?
+                break;
+            case 6:
+                // ?
+                break;
+            case 9:
+                // ?
+                break;"""
+    new_switch = """            case 3:
+                BuyFromAuctionHouse(message.itemTemplateID, message.texture, message.decal, message.key);
+                break;
+            case 4:
+                ConfirmSellToAuctionHouse(message.itemGlobalID, message.key);
+                break;
+            case 5:
+                SendAuctionHouseContents(message.npcGlobalID, message.category, message.key);
+                break;
+            case 6:
+                SellToAuctionHouse(message.itemGlobalID, message.key);
+                break;
+            case 9:
+                SendToSocket(new WIZARD_12_PROTOCOL.MSG_AUCTIONRESPONSE {
+                    Command = 9,
+                    ReturnCode = 0
+                });
+                break;"""
+    replace("Game/Services/AuctionHouseService.cs", old_switch, new_switch)
+
+    old_confirm_buy = """    private void ConfirmBuyFromAuctionHouse(ulong templateId, uint key) {"""
+    new_confirm_sell = """    private void ConfirmSellToAuctionHouse(ulong itemGlobalId, uint key) {
+        var wizard = GetActiveWizard();
+        if (wizard is null) return;
+
+        var item = wizard.InventoryBehavior?.GetItem(itemGlobalId);
+        if (item is null) return;
+
+        var entry = AuctionHouseCollection.GetAuctionHouseEntry(item.m_templateID.Full);
+        int sellPrice = entry?.m_sellPrice ?? 25;
+
+        SendToSocket(new WIZARD_12_PROTOCOL.MSG_AUCTIONRESPONSE {
+            Command = 4,
+            ItemTemplateID = item.m_templateID,
+            Cost = sellPrice,
+            ReturnCode = 0
+        });
+    }
+
+    private void ConfirmBuyFromAuctionHouse(ulong templateId, uint key) {"""
+    replace("Game/Services/AuctionHouseService.cs", old_confirm_buy, new_confirm_sell)
+
+
 def main() -> None:
     shutil.copytree(ORIGINAL, SOURCE, dirs_exist_ok=True)
     for path in SOURCE.rglob("*.cs"):
@@ -554,7 +1032,15 @@ def main() -> None:
     patch_dorm_and_zones()
     patch_bank_system()
     patch_pet_feeding()
+    patch_jewel_system()
+    patch_stitching_system()
+    patch_crafting_system()
+    patch_pvp_system()
+    patch_bazaar_system()
     shutil.copy2(ROOT / "BankService.cs", SOURCE / "Game/Services/BankService.cs")
+    shutil.copy2(ROOT / "InteractSeamstressComponent.cs", SOURCE / "Game/Zone/Components/InteractSeamstressComponent.cs")
+    shutil.copy2(ROOT / "CraftingService.cs", SOURCE / "Game/Services/CraftingService.cs")
+    shutil.copy2(ROOT / "TradeService.cs", SOURCE / "Game/Services/TradeService.cs")
     shutil.copy2(ROOT / "CombatAccuracy.cs", SOURCE / "Game/Combat/CombatAccuracy.cs")
     shutil.copy2(ROOT / "EquipmentItemCards.cs", SOURCE / "Game/EquipmentItemCards.cs")
     shutil.copy2(ROOT / "InfiniteMana.cs", SOURCE / "Game/InfiniteMana.cs")
@@ -579,7 +1065,7 @@ def main() -> None:
     shutil.copy2(ROOT / "CrownShopModels.cs", SOURCE / "Game/CrownShop/CrownShopModels.cs")
     shutil.copy2(ROOT / "CrownShopHandler.cs", SOURCE / "Game/CrownShop/CrownShopHandler.cs")
     shutil.copy2(ROOT / "CrownShopService.cs", SOURCE / "Game/Services/CrownShopService.cs")
-    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),")
+    replace("Game/GameServiceFactory.cs", "        typeof(MinigameService),", "        typeof(MinigameService),\n        typeof(CrownShopService),\n        typeof(EnemyInspectorService),\n        typeof(SpellRewardService),\n        typeof(BankService),\n        typeof(CraftingService),\n        typeof(TradeService),")
     replace("Game/Services/MinigameService.cs", "        // The raw message is just like any other message sent by the client.", """        if (message.JobID == EnemyInspectorService.JobId || message.JobID == SpellRewardService.JobId) {
             return;
         }
