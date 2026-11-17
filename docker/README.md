@@ -9,7 +9,7 @@ Imlight's pinned code explicitly supports an external RavenDB connection via `[D
 
 - Separate Compose project: `spiral-shuffle` (container `spiral-shuffle-database-1`), running as the `spiral-shuffle` service user's UID/GID from `docker/.env` (`SPIRAL_SHUFFLE_UID=…`, `SPIRAL_SHUFFLE_GID=…`), never another product's UID.
 - Official, fixed-version RavenDB image: `ravendb/ravendb:7.2.6-ubuntu.24.04-x64` (matching the RavenDB 7.2 family of the Imlight 7.2.4 client).
-- Dedicated persistent named volume `spiral-shuffle_ravendb_data`, owned by the `spiral-shuffle` UID.
+- Dedicated persistent named volumes, all owned by the `spiral-shuffle` UID: `spiral-shuffle_ravendb_data` (databases), `spiral-shuffle_ravendb_config` (`/etc/ravendb`), `spiral-shuffle_ravendb_logs` and `spiral-shuffle_ravendb_home`. Before the first start, chown them once as root: `sudo docker run --rm --user 0 -v spiral-shuffle_ravendb_home:/var/lib/ravendb:nocopy -v spiral-shuffle_ravendb_data:/var/lib/ravendb/data:nocopy -v spiral-shuffle_ravendb_config:/etc/ravendb -v spiral-shuffle_ravendb_logs:/var/log/ravendb:nocopy --entrypoint chown ravendb/ravendb:7.2.6-ubuntu.24.04-x64 -R "$(id -u spiral-shuffle):$(id -g spiral-shuffle)" /var/lib/ravendb /etc/ravendb /var/log/ravendb`.
 - Database bound ONLY to `127.0.0.1:18080` on the Ubuntu host. No router forwarding, Cloudflare routing, UFW public rule or external browser access to the DB.
 - Your existing embedded RavenDB on `127.0.0.1:8090` stays untouched during migration.
 - No edits to any existing Docker Compose file, bot, SSH, Tailscale, or portfolio.

@@ -21,8 +21,29 @@ services:
       # PublicServerUrl must be reachable by this single node from WITHIN
       # its own network namespace. Use the same HTTP port inside and out.
       RAVEN_PublicServerUrl: "http://127.0.0.1:18080"
+    # The image's own directories are reachable only by its built-in UID 999,
+    # so every path RavenDB writes is a named volume owned by spiral-shuffle.
+    # nocopy stops Docker from resetting a volume root to the image's owner.
     volumes:
-      - ravendb_data:/var/lib/ravendb/data
+      - type: volume
+        source: ravendb_home
+        target: /var/lib/ravendb
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_data
+        target: /var/lib/ravendb/data
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_config
+        target: /etc/ravendb
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_logs
+        target: /var/log/ravendb
+        volume: {nocopy: true}
 
 volumes:
+  ravendb_home:
   ravendb_data:
+  ravendb_config:
+  ravendb_logs:
