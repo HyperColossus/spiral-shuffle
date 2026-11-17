@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import shlex
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -73,8 +74,8 @@ class FirewallTests(unittest.TestCase):
     def test_reconcile_changes_only_its_profile_and_preserves_shared_ip(self):
         existing = "\n".join([
             "ufw allow OpenSSH", "ufw allow from 100.96.206.48 to any port 12379 proto tcp",
-            "ufw " + " ".join(fw.rule("8.8.8.8")),
-            "ufw " + " ".join(fw.rule("9.9.9.9")),
+            "ufw " + shlex.join(fw.rule("8.8.8.8")),
+            "ufw " + shlex.join(fw.rule("9.9.9.9")),
         ])
         command = mock.Mock(side_effect=lambda *args: (
             "Status: active\nDefault: deny (incoming), allow (outgoing)\n" if args == ("status", "verbose")
@@ -86,9 +87,28 @@ class FirewallTests(unittest.TestCase):
         command.reset_mock()
         command.side_effect = lambda *args: (
             "Status: active\nDefault: deny (incoming)" if args == ("status", "verbose")
-            else "ufw " + " ".join(fw.rule("9.9.9.9")))
+            else "ufw " + shlex.join(fw.rule("9.9.9.9")))
         fw.reconcile({"9.9.9.9"}, command)
         self.assertEqual(command.call_count, 2)
+
+    def test_legacy_tagged_rules_are_rewritten_with_product_prefixed_comment(self):
+        self.assertTrue(fw.TAG.startswith("spiral-shuffle:"))
+        existing = "\n".join([
+            "ufw allow OpenSSH",
+            "ufw allow from 8.8.8.8 to any app SpiralShuffleRegistered comment 'spiral-signup-v1'",
+            "ufw allow from 9.9.9.9 to any app SpiralShuffleRegistered comment 'spiral-signup-v1'",
+        ])
+        command = mock.Mock(side_effect=lambda *args: (
+            "Status: active\nDefault: deny (incoming), allow (outgoing)\n" if args == ("status", "verbose")
+            else existing if args == ("show", "added") else ""))
+        self.assertEqual(fw.reconcile({"9.9.9.9"}, command), 1)
+        self.assertEqual(command.call_args_list[2:], [
+            mock.call("--force", "delete", *fw.rule("8.8.8.8", "spiral-signup-v1")),
+            mock.call("--force", "delete", *fw.rule("9.9.9.9", "spiral-signup-v1")),
+            mock.call(*fw.rule("9.9.9.9"))])
+        # Real `ufw show added` quotes the comment containing a space.
+        self.assertEqual(fw.managed_ips("ufw allow from 9.9.9.9 to any app SpiralShuffleRegistered "
+                                        "comment 'spiral-shuffle: spiral-signup-v1'"), {"9.9.9.9"})
 
     def test_unmanaged_profile_or_inactive_firewall_aborts_before_mutation(self):
         for status, added in [

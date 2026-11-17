@@ -1,0 +1,16 @@
+[Unit]
+Description=Deploy tested Spiral Shuffle main updates
+After=spiral-shuffle-game.service
+
+[Service]
+Type=oneshot
+User=spiral-shuffle
+Group=spiral-shuffle
+Environment=SPIRAL_DATA_DIR=@DATA_DIR@
+WorkingDirectory=@ROOT@
+ExecStart=/usr/bin/python3 @ROOT@/auto_deploy.py
+TimeoutStartSec=900
+UMask=0077
+# Restarting the game and API is allowed by the polkit rule
+# spiral-shuffle.rules, so no sudo and no new privileges are needed.
+NoNewPrivileges=true

@@ -4,3 +4,6 @@
 *.cs text eol=lf
 *.ps1 text eol=crlf
 *.cmd text eol=crlf
+portal/** text eol=lf
+*.service text eol=lf
+*.timer text eol=lf

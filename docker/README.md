@@ -7,9 +7,9 @@ Imlight's pinned code explicitly supports an external RavenDB connection via `[D
 
 ## Why the new container is isolated
 
-- Separate Compose project: `spiral-shuffle-ravendb`.
+- Separate Compose project: `spiral-shuffle` (container `spiral-shuffle-database-1`), running as the `spiral-shuffle` service user's UID/GID from `docker/.env` (`SPIRAL_SHUFFLE_UID=…`, `SPIRAL_SHUFFLE_GID=…`), never another product's UID.
 - Official, fixed-version RavenDB image: `ravendb/ravendb:7.2.6-ubuntu.24.04-x64` (matching the RavenDB 7.2 family of the Imlight 7.2.4 client).
-- Dedicated persistent named volume `spiral-shuffle-ravendb_spiral_data`.
+- Dedicated persistent named volumes, all owned by the `spiral-shuffle` UID: `spiral-shuffle_ravendb_data` (databases), `spiral-shuffle_ravendb_config` (`/etc/ravendb`), `spiral-shuffle_ravendb_logs` and `spiral-shuffle_ravendb_home`. Before the first start, chown them once as root: `sudo docker run --rm --user 0 -v spiral-shuffle_ravendb_home:/var/lib/ravendb:nocopy -v spiral-shuffle_ravendb_data:/var/lib/ravendb/data:nocopy -v spiral-shuffle_ravendb_config:/etc/ravendb -v spiral-shuffle_ravendb_logs:/var/log/ravendb:nocopy --entrypoint chown ravendb/ravendb:7.2.6-ubuntu.24.04-x64 -R "$(id -u spiral-shuffle):$(id -g spiral-shuffle)" /var/lib/ravendb /etc/ravendb /var/log/ravendb`.
 - Database bound ONLY to `127.0.0.1:18080` on the Ubuntu host. No router forwarding, Cloudflare routing, UFW public rule or external browser access to the DB.
 - Your existing embedded RavenDB on `127.0.0.1:8090` stays untouched during migration.
 - No edits to any existing Docker Compose file, bot, SSH, Tailscale, or portfolio.
@@ -23,7 +23,7 @@ RavenDB 7.2 returns **HTTP 503** if `RAVEN_ServerUrl=http://0.0.0.0:8080` is com
 If you already started the older Compose file and get 503, update safely:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git pull --ff-only
 sudo docker compose -f docker/ravendb.compose.yml up -d
 curl -sS -i --max-time 10 http://127.0.0.1:18080/build/version
@@ -37,7 +37,7 @@ This recreates the service if the configuration changed but **does not delete it
 On Ubuntu:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git pull --ff-only
 docker compose -f docker/ravendb.compose.yml config
 docker ps --format 'table {{.Names}}\t{{.Ports}}'
@@ -64,7 +64,7 @@ An older Docker Compose configuration forwarded Ubuntu port **18080** to contain
 The fixed Compose file now binds RavenDB on **0.0.0.0:18080 inside Docker**, publishes **127.0.0.1:18080:18080 on Ubuntu**, and advertises **http://127.0.0.1:18080**. Both the internal node and Ubuntu client can reach the advertised URL; the host's exposed port stays loopback-only.
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git pull --ff-only
 sudo docker compose -f docker/ravendb.compose.yml up -d
 sudo docker compose -f docker/ravendb.compose.yml ps
@@ -82,7 +82,7 @@ The first `curl` immediately after container recreation may fail while RavenDB s
 1. On **Windows PowerShell**, open a private SSH tunnel to the Docker RavenDB on Ubuntu:
 
    ```powershell
-   ssh -N -L 18080:127.0.0.1:18080 hypercolossus@192.168.95.76
+   ssh -N -L 18080:127.0.0.1:18080 <your-login>@192.168.95.76
    ```
 
    Keep the PowerShell window open and visit `http://127.0.0.1:18080` in a browser. This uses only your local SSH tunnel; do **not** publish Docker RavenDB in Cloudflare or your router.
@@ -92,7 +92,7 @@ The first `curl` immediately after container recreation may fail while RavenDB s
 3. On Ubuntu, the game is currently stopped. Before creating a fresh game admin account, edit the live config privately:
 
    ```bash
-   cd ~/spiral-shuffle
+   cd /opt/spiral-shuffle
    nano .runtime/server/Config/Imlight.ini
    ```
 
@@ -125,7 +125,7 @@ Arrange a short maintenance window: prevent players from logging in during expor
 On your Windows computer, open PowerShell and create an SSH tunnel that grants your own browser access to both private databases:
 
 ```powershell
-ssh -N -L 18090:127.0.0.1:8090 -L 18080:127.0.0.1:18080 hypercolossus@192.168.95.76
+ssh -N -L 18090:127.0.0.1:8090 -L 18080:127.0.0.1:18080 <your-login>@192.168.95.76
 ```
 
 This tunnels the database ports to your Windows PC only. Do not expose them to the internet. Keep the PowerShell window open.
@@ -149,7 +149,7 @@ Official docs: https://docs.ravendb.net/7.2/studio/database/tasks/import-data/im
 Verify Ubuntu can read the new database:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 python3 docker/db_config.py check
 ```
 
@@ -160,7 +160,7 @@ It refuses an empty/unreachable database. This is a preflight, not proof the com
 On Ubuntu, **once the import and counts have been verified**:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 ./Stop-Linux.sh
 python3 docker/db_config.py switch --confirm-imported
 ./Play-Linux.sh

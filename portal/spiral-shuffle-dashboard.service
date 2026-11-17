@@ -1,0 +1,18 @@
+[Unit]
+Description=Spiral Shuffle private live log dashboard (loopback only)
+
+[Service]
+Type=simple
+User=spiral-shuffle
+Group=spiral-shuffle
+Environment=SPIRAL_DATA_DIR=@DATA_DIR@
+WorkingDirectory=@DATA_DIR@/runtime/live-dashboard
+ExecStart=/usr/bin/python3 @DATA_DIR@/runtime/live-dashboard/dashboard.py
+Restart=on-failure
+RestartSec=3
+# Journal lines come from the root-owned spiral-shuffle-logs helper through
+# sudo (see spiral-shuffle-logs.sudoers), so new privileges must be allowed.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

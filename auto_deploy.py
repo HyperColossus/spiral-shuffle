@@ -25,8 +25,8 @@ STATE = PRIVATE / "state.json"
 REPOSITORY = "HyperColossus/spiral-shuffle"
 WORKFLOW = ".github/workflows/deploy-gate.yml"
 SHA = re.compile(r"[0-9a-f]{40}")
-GAME_UNIT = "spiral-game.service"
-API_UNIT = "spiral-portal.service"
+GAME_UNIT = "spiral-shuffle-game.service"
+API_UNIT = "spiral-shuffle-portal.service"
 
 
 class RecoveryFailed(RuntimeError):
@@ -44,7 +44,9 @@ def git(*args):
 
 
 def systemctl(*args):
-    return command("systemctl", "--user", *args, timeout=240)
+    # System units; the polkit rule portal/spiral-shuffle.rules allows only
+    # start/stop/restart of GAME_UNIT and API_UNIT for the service user.
+    return command("systemctl", "--no-ask-password", *args, timeout=240)
 
 
 def save_state(state):

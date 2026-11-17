@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-ROOT = Path("/home/hypercolossus/spiral-shuffle")
+ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / ".build/source"
 
 class GuildMuseumUnlocksTests(unittest.TestCase):

@@ -1,11 +1,14 @@
 # Separate, optional RavenDB service for Spiral Shuffle.
 # DO NOT add this to any existing bot/web Docker Compose project.
 # Explicitly bound to 127.0.0.1:18080: database is never internet-facing.
-name: spiral-shuffle-ravendb
+name: spiral-shuffle
 services:
   database:
     image: ravendb/ravendb:7.2.6-ubuntu.24.04-x64
     restart: unless-stopped
+    # Run as the spiral-shuffle service user, never as another product's UID.
+    # docker/.env on the server sets SPIRAL_SHUFFLE_UID/GID (id -u/-g spiral-shuffle).
+    user: "${SPIRAL_SHUFFLE_UID:?set in docker/.env}:${SPIRAL_SHUFFLE_GID:?set in docker/.env}"
     ports:
       - "127.0.0.1:18080:18080"
     environment:
@@ -18,8 +21,29 @@ services:
       # PublicServerUrl must be reachable by this single node from WITHIN
       # its own network namespace. Use the same HTTP port inside and out.
       RAVEN_PublicServerUrl: "http://127.0.0.1:18080"
+    # The image's own directories are reachable only by its built-in UID 999,
+    # so every path RavenDB writes is a named volume owned by spiral-shuffle.
+    # nocopy stops Docker from resetting a volume root to the image's owner.
     volumes:
-      - spiral_data:/var/lib/ravendb/data
+      - type: volume
+        source: ravendb_home
+        target: /var/lib/ravendb
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_data
+        target: /var/lib/ravendb/data
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_config
+        target: /etc/ravendb
+        volume: {nocopy: true}
+      - type: volume
+        source: ravendb_logs
+        target: /var/log/ravendb
+        volume: {nocopy: true}
 
 volumes:
-  spiral_data:
+  ravendb_home:
+  ravendb_data:
+  ravendb_config:
+  ravendb_logs:

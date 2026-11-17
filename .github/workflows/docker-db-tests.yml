@@ -44,7 +44,7 @@ jobs:
       - name: Python syntax checks
         run: python3 -m py_compile docker/db_config.py portal_api.py portal_bridge.py portal_access.py portal/access_firewall.py tests/test_docker_db.py tests/test_portal_api.py tests/test_portal_access.py
       - name: Docker Compose validation (no container startup)
-        run: docker compose -f docker/ravendb.compose.yml config --quiet
+        run: SPIRAL_SHUFFLE_UID=990 SPIRAL_SHUFFLE_GID=990 docker compose -f docker/ravendb.compose.yml config --quiet
       - name: Test migration safeguards
         run: python3 -m unittest discover -s tests -p 'test_docker_db.py' -v
       - name: Test registration validation

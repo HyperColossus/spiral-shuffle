@@ -2,6 +2,8 @@
 import shutil
 from pathlib import Path
 
+from profile_paths import REVISION, REVIVE_DIR
+
 from vendor_hooks import patch_vendor_hooks
 from spell_drop_hooks import patch_spell_drops
 from item_card_hooks import patch_item_cards
@@ -306,7 +308,7 @@ def patch_dorm_and_zones() -> None:
             if (File.Exists(p)) return p;
         }
         string[] candidates = [
-            "/home/hypercolossus/Revive101/Aurorium/data/V_r806919.Wizard_1_610/Data/GameData",
+            "@REVIVE_GAMEDATA@",
             "GameData",
             "../../Data/GameData",
             "../Data/GameData",
@@ -320,7 +322,8 @@ def patch_dorm_and_zones() -> None:
         return null;
     }
 
-    private static uint GetWadCrc(Archive wad) {""")
+    private static uint GetWadCrc(Archive wad) {""".replace(
+        "@REVIVE_GAMEDATA@", (REVIVE_DIR / "Aurorium/data" / REVISION / "Data/GameData").as_posix()))
 
 
 def patch_bank_system() -> None:

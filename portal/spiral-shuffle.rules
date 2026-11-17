@@ -1,0 +1,15 @@
+// Installed as /etc/polkit-1/rules.d/50-spiral-shuffle.rules (root-owned).
+// Lets the spiral-shuffle service user start, stop and restart only its own
+// game and registration API, so the unprivileged deployer needs no sudo.
+polkit.addRule(function(action, subject) {
+    if (action.id != "org.freedesktop.systemd1.manage-units" || subject.user != "spiral-shuffle") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var unit = action.lookup("unit");
+    var verb = action.lookup("verb");
+    if ((unit == "spiral-shuffle-game.service" || unit == "spiral-shuffle-portal.service") &&
+        (verb == "start" || verb == "stop" || verb == "restart")) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});
