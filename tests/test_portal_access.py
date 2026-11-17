@@ -93,16 +93,13 @@ class FirewallTests(unittest.TestCase):
 
     def test_legacy_tagged_rules_are_rewritten_with_product_prefixed_comment(self):
         self.assertTrue(fw.TAG.startswith("spiral-shuffle:"))
-        existing = "
-".join([
+        existing = "\n".join([
             "ufw allow OpenSSH",
             "ufw allow from 8.8.8.8 to any app SpiralShuffleRegistered comment 'spiral-signup-v1'",
             "ufw allow from 9.9.9.9 to any app SpiralShuffleRegistered comment 'spiral-signup-v1'",
         ])
         command = mock.Mock(side_effect=lambda *args: (
-            "Status: active
-Default: deny (incoming), allow (outgoing)
-" if args == ("status", "verbose")
+            "Status: active\nDefault: deny (incoming), allow (outgoing)\n" if args == ("status", "verbose")
             else existing if args == ("show", "added") else ""))
         self.assertEqual(fw.reconcile({"9.9.9.9"}, command), 1)
         self.assertEqual(command.call_args_list[2:], [
