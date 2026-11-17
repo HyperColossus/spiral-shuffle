@@ -17,7 +17,11 @@ import sys
 import time
 
 APP = "SpiralShuffleRegistered"
-TAG = "spiral-signup-v1"
+# Every UFW rule on the server carries a comment starting with the product
+# name. The signup-v1 suffix keeps managed rules recognisable; rules still
+# carrying the legacy bare tag are adopted and rewritten with the new one.
+TAG = "spiral-shuffle: spiral-signup-v1"
+LEGACY_TAGS = ("spiral-signup-v1",)
 PROFILE = "[SpiralShuffleRegistered]\ntitle=Spiral Shuffle registered players\ndescription=Signup-based game access\nports=12010,12343:12348,12510,12379/tcp\n"
 MAX_ROWS = 10000
 LEASE_SECONDS = 30 * 86400
@@ -64,12 +68,13 @@ def desired_ips(rows, now):
     return wanted
 
 
-def rule(ip):
-    return ["allow", "from", public_ipv4(ip), "to", "any", "app", APP, "comment", TAG]
+def rule(ip, tag=TAG):
+    return ["allow", "from", public_ipv4(ip), "to", "any", "app", APP, "comment", tag]
 
 
-def managed_ips(output):
-    found = set()
+def managed_rules(output):
+    """Map each managed address to the tag its rule carries."""
+    found = {}
     for line in output.splitlines():
         tokens = shlex.split(line)
         if APP not in tokens:
@@ -78,10 +83,15 @@ def managed_ips(output):
         if len(tokens) != 10 or tokens[0] != "ufw":
             raise ValueError("Unexpected rule for reserved application profile")
         ip = public_ipv4(tokens[3])
-        if tokens != ["ufw", *rule(ip)]:
+        tag = tokens[9]
+        if tag not in (TAG, *LEGACY_TAGS) or tokens != ["ufw", *rule(ip, tag)]:
             raise ValueError("Unmanaged rule uses reserved application profile")
-        found.add(ip)
+        found[ip] = tag
     return found
+
+
+def managed_ips(output):
+    return set(managed_rules(output))
 
 
 def run_ufw(*args):
@@ -95,11 +105,13 @@ def reconcile(wanted, ufw=run_ufw):
     status = ufw("status", "verbose")
     if not status.startswith("Status: active") or "Default: deny (incoming)" not in status:
         raise ValueError("Requires active UFW with default-deny incoming traffic")
-    current = managed_ips(ufw("show", "added"))
-    for ip in sorted(current - wanted):
-        ufw("--force", "delete", *rule(ip))
-    for ip in sorted(wanted - current):
-        ufw(*rule(ip))
+    current = managed_rules(ufw("show", "added"))
+    for ip, tag in sorted(current.items()):
+        if ip not in wanted or tag != TAG:
+            ufw("--force", "delete", *rule(ip, tag))
+    for ip in sorted(wanted):
+        if current.get(ip) != TAG:
+            ufw(*rule(ip))
     return len(wanted)
 
 

@@ -68,7 +68,9 @@ public static class CrownShopHandler {
         var configPath = string.IsNullOrEmpty(s_crownShopConfigPath) ? "./spiraldb-cache/CrownShop" : s_crownShopConfigPath;
         var basePath = Path.GetFullPath(configPath);
         if (!Directory.Exists(basePath)) {
-            var fallback = Path.GetFullPath("/home/hypercolossus/Revive101/Imlight/spiraldb-cache/CrownShop");
+            var dataDir = Environment.GetEnvironmentVariable("SPIRAL_DATA_DIR");
+            if (string.IsNullOrEmpty(dataDir)) dataDir = "/var/lib/spiral-shuffle";
+            var fallback = Path.GetFullPath(Path.Combine(dataDir, "Revive101/Imlight/spiraldb-cache/CrownShop"));
             if (Directory.Exists(fallback)) {
                 basePath = fallback;
             } else {

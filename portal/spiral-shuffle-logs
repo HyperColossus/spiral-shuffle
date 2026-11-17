@@ -1,0 +1,14 @@
+#!/bin/sh
+# Installed root-owned as /usr/local/sbin/spiral-shuffle-logs.
+# Prints the last 150 journal lines of one Spiral Shuffle unit for the
+# loopback dashboard. It accepts only these fixed names, so the
+# spiral-shuffle user can read its own logs without journal group access.
+set -eu
+case "${1:-}" in
+    registration) unit=spiral-shuffle-portal.service ;;
+    updates) unit=spiral-shuffle-auto-deploy.service ;;
+    access) unit=spiral-shuffle-access.service ;;
+    game) unit=spiral-shuffle-game.service ;;
+    *) echo "usage: spiral-shuffle-logs registration|updates|access|game" >&2; exit 2 ;;
+esac
+exec /usr/bin/journalctl -u "$unit" -n 150 --no-pager -o short-iso --quiet

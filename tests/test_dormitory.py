@@ -1,10 +1,11 @@
 import json
+import os
 import unittest
 from pathlib import Path
 
-ROOT = Path("/home/hypercolossus/spiral-shuffle")
+ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / ".build/source"
-SPIRALDB = Path("/home/hypercolossus/Revive101/Imlight/spiraldb-cache")
+SPIRALDB = Path(os.environ.get("SPIRAL_DATA_DIR", "/var/lib/spiral-shuffle")) / "Revive101/Imlight/spiraldb-cache"
 
 
 class DormitoryTests(unittest.TestCase):

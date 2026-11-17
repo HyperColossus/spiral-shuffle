@@ -33,7 +33,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual(deploy.deployment_kind(["portal_api.py","tests/test_portal_api.py"]), "api")
         self.assertEqual(deploy.deployment_kind(["PortalRegistration.cs","portal_api.py"]), "bridge")
         for path in ("pack_assets.py","prepare_source.py",".runtime/saves/players","docker/ravendb.compose.yml",
-                     "portal/access_firewall.py","portal/spiral-game.service","auto_deploy.py","../portal_api.py"):
+                     "portal/access_firewall.py","portal/spiral-shuffle-game.service","auto_deploy.py","../portal_api.py"):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 deploy.deployment_kind([path])
 
@@ -176,11 +176,31 @@ class DeploymentDecisionTests(unittest.TestCase):
 
 
 class InstallationSafetyTests(unittest.TestCase):
-    def test_missing_user_units_are_skipped_on_first_install(self):
-        missing=type("Result",(),{"stdout":"not-found\n"})()
-        with mock.patch.object(installer.subprocess,"run",return_value=missing),mock.patch.object(installer,"run") as run:
-            installer.stop_existing_user_units()
-        run.assert_not_called()
+    def test_units_run_as_service_user_with_paths_from_one_setting(self):
+        root,data=Path("/opt/spiral-shuffle"),Path("/var/lib/spiral-shuffle")
+        for name in installer.UNITS:
+            with self.subTest(unit=name):
+                text=installer.render_unit(name,root,data)
+                self.assertNotIn("@ROOT@",text);self.assertNotIn("@DATA_DIR@",text)
+                self.assertNotIn("/home/",text)
+                expected="root" if "-access." in name else installer.SERVICE_USER
+                if name.endswith(".service"):
+                    self.assertIn(f"User={expected}\n",text)
+                    if expected!="root":
+                        self.assertIn(f"Environment=SPIRAL_DATA_DIR={data}\n",text)
+        self.assertIn(f"--owner spiral-shuffle --database {data}/runtime/portal/access.sqlite3",
+                      installer.render_unit("spiral-shuffle-access.service",root,data))
+        self.assertEqual({deploy.GAME_UNIT,deploy.API_UNIT},{"spiral-shuffle-game.service","spiral-shuffle-portal.service"})
+
+    def test_service_user_may_only_restart_its_own_units(self):
+        folder=Path(installer.__file__).parent/"portal"
+        rules=(folder/"spiral-shuffle.rules").read_text()
+        self.assertIn('subject.user != "spiral-shuffle"',rules)
+        for unit in (deploy.GAME_UNIT,deploy.API_UNIT):
+            self.assertIn(f'"{unit}"',rules)
+        sudoers=(folder/"spiral-shuffle-logs.sudoers").read_text()
+        self.assertTrue(all(entry.strip().startswith("/usr/local/sbin/spiral-shuffle-logs ")
+                            for entry in sudoers.split("NOPASSWD:")[1].split(",")))
 
     def test_dead_supervised_pid_cleanup_never_removes_another_pidfile(self):
         with tempfile.TemporaryDirectory() as folder:

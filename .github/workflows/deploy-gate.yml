@@ -37,8 +37,13 @@ jobs:
         run: dotnet run --project tests/portal-bridge-tests/PortalBridgeTests.csproj -c Release
       - name: Validate service unit syntax
         run: |
-          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-game.service > /tmp/spiral-game.service
-          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-portal.service > /tmp/spiral-portal.service
-          sed 's|@ROOT@|/tmp/spiral-shuffle|g' portal/spiral-auto-deploy.service > /tmp/spiral-auto-deploy.service
-          cp portal/spiral-auto-deploy.timer /tmp/spiral-auto-deploy.timer
-          systemd-analyze verify --man=no /tmp/spiral-game.service /tmp/spiral-portal.service /tmp/spiral-auto-deploy.service /tmp/spiral-auto-deploy.timer
+          for unit in portal/spiral-shuffle-*.service portal/spiral-shuffle-*.timer; do
+            sed -e 's|@ROOT@|/opt/spiral-shuffle|g' -e 's|@DATA_DIR@|/var/lib/spiral-shuffle|g' "$unit" > "/tmp/$(basename "$unit")"
+          done
+          sudo useradd --system --no-create-home --shell /usr/sbin/nologin spiral-shuffle || true
+          sudo mkdir -p /opt/spiral-shuffle /var/lib/spiral-shuffle/runtime/live-dashboard
+          sudo cp *.py /opt/spiral-shuffle/
+          sudo touch /var/lib/spiral-shuffle/runtime/live-dashboard/dashboard.py
+          systemd-analyze verify --man=no /tmp/spiral-shuffle-*.service /tmp/spiral-shuffle-*.timer
+          sudo visudo -cf portal/spiral-shuffle-logs.sudoers
+          sh -n portal/spiral-shuffle-logs

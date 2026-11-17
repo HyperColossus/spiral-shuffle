@@ -27,7 +27,7 @@ The API binds **127.0.0.1:12771**, the bridge binds **127.0.0.1:12772**, and Doc
 Do this from SSH, while the server is available. It changes only the compiled, staged `Imlight.Director.dll` and the pinned Director source; it does **not** rerun randomized asset generation or touch saves, Docker, Discord, SSH, Tailscale, or any unrelated processes.
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git pull --ff-only
 python3 -m unittest discover -s tests -p 'test_portal_api.py' -v
 python3 portal_bridge.py init
@@ -50,7 +50,7 @@ If you used the earlier `admin / 123` temporary test database, **do not open pub
 First confirm the bridge health check above succeeds. On Ubuntu:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 set -a
 source .runtime/portal/portal.env
 set +a
@@ -123,19 +123,18 @@ The GitHub Pages account form stays **disabled** if either `registrationApi` or 
 
 **Caddy requirement:** `portal/Caddyfile.example` deliberately **overwrites** `X-Real-IP` with `{remote_host}`; this prevents a client from supplying a fake rate-limit identity. If using a CDN in front, configure trusted proxy addresses carefully or many visitors will share one rate limit.
 
-## D. Run as a persistent user service
+## D. Run as a persistent system service
 
-After you finish local tests and configure the portal environment:
+After you finish local tests and configure the portal environment, run
+`sudo python3 install_services.py` from `/opt/spiral-shuffle` (see
+README-SERVICES.md). It installs `spiral-shuffle-portal.service` as a system
+unit running as the `spiral-shuffle` user. Check it with:
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp ~/spiral-shuffle/portal/spiral-portal.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now spiral-portal.service
-systemctl --user status spiral-portal.service
+systemctl status spiral-shuffle-portal.service
 ```
 
-This user service starts **only the registration API**; it does not manage the game server or other containers. If you want it to survive logging out and aren't already using user service lingering, see `loginctl` documentation before changing host settings. Keep `.runtime/portal/portal.env` and token mode `0600`.
+This service starts **only the registration API**; it does not manage the game server or other containers. If you want it to survive logging out and aren't already using user service lingering, see `loginctl` documentation before changing host settings. Keep `.runtime/portal/portal.env` and token mode `0600`.
 
 ## Security and limitations
 

@@ -96,7 +96,7 @@ After updating this fork, repair an existing `.runtime/` without rerunning
 asset generation:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git pull --ff-only
 python3 linux_runtime.py repair
 python3 linux_runtime.py repair-deps
@@ -129,7 +129,7 @@ If startup reports `libhostpolicy.so` missing or that `Imlight.Director.runtimec
 Do **not** delete your game assets or reinstall .NET. In the fork folder run:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 python3 linux_runtime.py repair
 python3 linux_runtime.py check
 ```

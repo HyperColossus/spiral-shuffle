@@ -8,34 +8,45 @@ push workflow. Pull-request checks, an older successful run, another repository
 or a different revision cannot authorize deployment.
 
 No GitHub token, deploy SSH key, inbound admin port, website secret or sudo
-permission is given to the web API/deployer. GitHub is contacted outbound. The
+permission is given to the web API/deployer. The deployer may start, stop and
+restart only `spiral-shuffle-game` and `spiral-shuffle-portal`, through the
+polkit rule `portal/spiral-shuffle.rules`. GitHub is contacted outbound. The
 public `/deployment` endpoint exposes only revision, status and update time;
 it never exposes credentials, private logs, paths or account data.
 
+## Server layout
+
+Spiral Shuffle has its own footprint on the server (see `/opt/SERVER-LAYOUT.md`):
+
+| What | Where |
+| --- | --- |
+| Service user | `spiral-shuffle` (system user, no login) |
+| Code | `/opt/spiral-shuffle` (this checkout) |
+| Data | `SPIRAL_DATA_DIR`, default `/var/lib/spiral-shuffle`: `runtime/` (the checkout's `.runtime` links here), `Revive101/` game data, `downloads/` |
+| Units | `spiral-shuffle-game`, `-portal`, `-dashboard`, `-auto-deploy.timer`, `-access.timer` (system units) |
+| Root helpers | `/usr/local/lib/spiral-shuffle/access_firewall.py`, `/usr/local/sbin/spiral-shuffle-logs` |
+| Database | Docker Compose project `spiral-shuffle`, RavenDB on 127.0.0.1:18080 as the `spiral-shuffle` UID |
+| Web | `/etc/caddy/sites/spiral-shuffle.caddy`; UFW comments start with `spiral-shuffle:` |
+
+`SPIRAL_DATA_DIR` is the only path setting; every unit sets it.
+
 ## One-time setup on Ubuntu
 
-Run as the existing `hypercolossus` game owner from the current checkout.
-The feature branch must include these files and pass its checks first:
+With the checkout at `/opt/spiral-shuffle` owned by `spiral-shuffle`, its
+`.runtime` linked to `/var/lib/spiral-shuffle/runtime`, and the existing
+private portal environment in place:
 
 ```bash
-cd ~/spiral-shuffle
-git pull --ff-only && python3 install_services.py
+cd /opt/spiral-shuffle
+sudo python3 install_services.py
 ```
 
-This requires your sudo password once; never send it to chat. Do not run the
-installer as root. If Git reports local changes/conflicts, preserve them and
-inspect rather than resetting. The installation requires the existing private
-portal environment, generated game runtime, patched source and compatible .NET
-SDK. If Node is absent, only the Node package needed for offline checks is added.
-
-The installer runs portal/operations/website checks first, enables lingering
-for the game owner, and stops only the owned game/API processes. It installs
-user services, builds the current registration bridge, starts the game and
-waits for bridge/game readiness before starting the API. It preserves the live
-CoreLib, generated assets, database configuration, portal environment and saves.
-It also installs/starts the already tested dedicated root-owned IP-access worker.
-The only web-server edit adds `/deployment` to the existing project proxy route;
-the old site configuration is backed up and validated before reload.
+The installer runs the portal/operations/website checks as the service user,
+installs the root-owned firewall worker, UFW profile, polkit rule and journal
+helper, installs and enables the system units, builds the registration bridge,
+waits for game and API health, checks the Caddy site and runs one firewall sync.
+It preserves the live CoreLib, generated assets, database configuration, portal
+environment and saves.
 
 While the feature is still a draft, automatic updates report `waiting_for_main`.
 The service contract file prevents the older current main from replacing the
@@ -90,21 +101,21 @@ https://register.spiral.hypercoloss.us/deployment
 Private Ubuntu status/logs when deeper diagnosis is needed:
 
 ```bash
-systemctl --user status spiral-game spiral-portal spiral-auto-deploy.timer
-journalctl --user -u spiral-auto-deploy.service -n 30 --no-pager
-sudo journalctl -u spiral-access.service -n 20 --no-pager
+systemctl status spiral-shuffle-game spiral-shuffle-portal spiral-shuffle-auto-deploy.timer
+sudo journalctl -u spiral-shuffle-auto-deploy.service -n 30 --no-pager
+sudo journalctl -u spiral-shuffle-access.service -n 20 --no-pager
 ```
 
 To pause automatic deployments without stopping the game:
 
 ```bash
-systemctl --user disable --now spiral-auto-deploy.timer
+sudo systemctl disable --now spiral-shuffle-auto-deploy.timer
 ```
 
 To resume:
 
 ```bash
-systemctl --user enable --now spiral-auto-deploy.timer
+sudo systemctl enable --now spiral-shuffle-auto-deploy.timer
 ```
 
 No unrelated Docker, Discord, SSH, Tailscale or portfolio service is restarted.

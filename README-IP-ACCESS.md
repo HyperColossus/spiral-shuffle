@@ -36,7 +36,7 @@ Existing SSH, Tailscale and other manual rules remain unchanged.
 On Ubuntu, while on the branch tracking `origin/codex/signup-ip-access`:
 
 ```bash
-cd ~/spiral-shuffle
+cd /opt/spiral-shuffle
 git status --short
 git pull --ff-only
 python3 -m unittest discover -s tests -p 'test_portal*.py' -v
@@ -77,14 +77,14 @@ There is no need to delete an account or save directory.
 Review the files and current `sudo ufw status verbose` / `sudo ufw show added`.
 Require active UFW with default-deny incoming. Existing broad game-port allow
 rules bypass this allowlist; inspect those without resetting the firewall.
-For owner `hypercolossus` and checkout `/home/hypercolossus/spiral-shuffle`:
+For service user `spiral-shuffle`, checkout `/opt/spiral-shuffle` and data directory `/var/lib/spiral-shuffle` (`install_services.py` does all of this):
 
 ```bash
 sudo install -d -o root -g root -m 0755 /usr/local/lib/spiral-shuffle
 sudo install -o root -g root -m 0644 portal/access_firewall.py /usr/local/lib/spiral-shuffle/access_firewall.py
 sudo install -o root -g root -m 0644 portal/spiral-shuffle-registered /etc/ufw/applications.d/spiral-shuffle-registered
-sudo install -o root -g root -m 0644 portal/spiral-access.service /etc/systemd/system/spiral-access.service
-sudo install -o root -g root -m 0644 portal/spiral-access.timer /etc/systemd/system/spiral-access.timer
+sed 's|@DATA_DIR@|/var/lib/spiral-shuffle|g' portal/spiral-shuffle-access.service | sudo tee /etc/systemd/system/spiral-shuffle-access.service >/dev/null
+sudo install -o root -g root -m 0644 portal/spiral-shuffle-access.timer /etc/systemd/system/spiral-shuffle-access.timer
 sudo systemctl daemon-reload
 ```
 
@@ -93,15 +93,15 @@ root Python from the web-writable checkout. API startup creates the private
 access database. Run one sync before enabling the timer:
 
 ```bash
-sudo systemctl start spiral-access.service
-sudo systemctl show spiral-access.service -p Result -p ExecMainStatus
-sudo journalctl -u spiral-access.service -n 10 --no-pager
+sudo systemctl start spiral-shuffle-access.service
+sudo systemctl show spiral-shuffle-access.service -p Result -p ExecMainStatus
+sudo journalctl -u spiral-shuffle-access.service -n 10 --no-pager
 ```
 
 After an empty-grant check and a controlled grant add/remove test succeed:
 
 ```bash
-sudo systemctl enable --now spiral-access.timer
+sudo systemctl enable --now spiral-shuffle-access.timer
 ```
 
 If the worker was already installed and tested, it does not need reinstalling for
@@ -140,7 +140,7 @@ the same public NAT share network reachability. IP access is not DDoS protection
 
 A worker failure preserves existing rules, including expired ones until a
 successful reconciliation. Existing TCP sessions may survive rule removal.
-Check `journalctl -u spiral-access.service` for worker failures. Incremental UFW
+Check `journalctl -u spiral-shuffle-access.service` for worker failures. Incremental UFW
 updates recover on the next successful run. Do not delete the access database
 or profile before withdrawing its rules.
 

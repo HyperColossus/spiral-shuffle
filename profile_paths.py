@@ -1,5 +1,6 @@
 """Paths for the private local runtime."""
 import json
+import os
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -13,6 +14,11 @@ class Settings(TypedDict):
 
 
 ROOT = Path(__file__).resolve().parent
+# The one installation setting for data locations. Production keeps game data,
+# saves and the private runtime under /var/lib/spiral-shuffle; the checkout's
+# .runtime entry is a symlink to DATA_DIR / "runtime" there.
+DATA_DIR = Path(os.environ.get("SPIRAL_DATA_DIR", "/var/lib/spiral-shuffle"))
+REVIVE_DIR = DATA_DIR / "Revive101"
 RUNTIME = ROOT / ".runtime"
 REVISION = "V_r806919.Wizard_1_610"
 

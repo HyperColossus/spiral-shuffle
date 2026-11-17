@@ -1,0 +1,3 @@
+# Installed as /etc/sudoers.d/spiral-shuffle-logs (root, 0440).
+# The dashboard may read its own units' journal and nothing else.
+spiral-shuffle ALL=(root) NOPASSWD: /usr/local/sbin/spiral-shuffle-logs registration, /usr/local/sbin/spiral-shuffle-logs updates, /usr/local/sbin/spiral-shuffle-logs access, /usr/local/sbin/spiral-shuffle-logs game

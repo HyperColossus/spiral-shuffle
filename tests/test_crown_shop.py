@@ -1,10 +1,11 @@
 import json
+import os
 import unittest
 from pathlib import Path
 import subprocess
 
-ROOT = Path("/home/hypercolossus/spiral-shuffle")
-CACHE = Path("/home/hypercolossus/Revive101/Imlight/spiraldb-cache/CrownShop")
+ROOT = Path(__file__).resolve().parents[1]
+CACHE = Path(os.environ.get("SPIRAL_DATA_DIR", "/var/lib/spiral-shuffle")) / "Revive101/Imlight/spiraldb-cache/CrownShop"
 
 
 class CrownShopTests(unittest.TestCase):
